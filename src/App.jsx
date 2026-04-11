@@ -1,193 +1,374 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 
 /*
-  POKLADNÍ DENÍK — MVP v2
-  Standalone demo – data v React state.
+  POKLADNÍ DENÍK — Helenka 1.0
+  Supabase backend – všechna data persistent v DB.
   Role: superadmin (vše), manažer (jen přiřazené firmy), zaměstnanec.
-  Demo: Adam Odehnal / PIN 9999 (superadmin), Michal Novák / 5555 (zaměstnanec),
-        Jakub Pechan / 7777 (manažer – vidí THE GOOD FOOD)
 */
 
 // ============================================================
-// SEED DATA
+// SUPABASE CONFIG
 // ============================================================
-// ============================================================
-// GOOGLE SHEETS & DRIVE
-// Service account: pokladni-denik-export@pokladni-denik.iam.gserviceaccount.com
-// Spreadsheet ID se nastavuje přímo u firmy v admin panelu.
-// ============================================================
-const SHEET_HEADERS = ["Datum", "Čas", "Typ", "Typ platby", "Kategorie", "Dodavatel/Odběratel", "Popis", "Bez DPH", "S DPH", "Vklad/Výběr", "Storno"];
+const SB_URL = "https://ekfjznjzmlslrtatervl.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVrZmp6bmp6bWxzbHJ0YXRlcnZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MzA0MzAsImV4cCI6MjA5MTQwNjQzMH0.nJij_8RjdTbZWho8Y_FOpzHSwe6OGjMG3K9A2MMPu4Y";
 
-// Google Drive – kořenová složka pro doklady
-const DRIVE_ROOT_FOLDER_ID = "1ZO5cektWhTT6AZTQJ3GiIuJHOyJMluAv";
-// Struktura: DRIVE_ROOT / [Firma] / [Zaměstnanec] / soubory...
-
-const SEED = {
-  firmy: [
-    { id: 1, nazev: "THE GOOD FOOD s.r.o.", spreadsheet_id: "1x_0DerKQtzFZcMG2XHQs0XgxeQOFwIRlSfzEZa7gJBA" },
-    { id: 2, nazev: "KREKRRR cz s.r.o.", spreadsheet_id: "1e6bwF2J5KI5kd6MnvzHwMIW9zwXwFORD5iW5zE6ZSjY" },
-    { id: 3, nazev: "THE GOOD EVENT s.r.o.", spreadsheet_id: "1XSvYW_2u3rrh7p8bLomvOFxVCfofQ8QjHt7C_nfz9DI" },
-  ],
-  // role: "superadmin" | "manazer" | "zamestnanec"
-  zamestnanci: [
-    { id: 1, jmeno: "Adam Odehnal", pin: "9999", role: "superadmin" },
-    { id: 2, jmeno: "Michal Novák", pin: "5555", role: "zamestnanec" },
-    { id: 3, jmeno: "Jakub Pechan", pin: "7777", role: "manazer" },
-  ],
-  assignments: [
-    { zamestnanec_id: 1, firma_id: 1 },
-    { zamestnanec_id: 1, firma_id: 2 },
-    { zamestnanec_id: 1, firma_id: 3 },
-    { zamestnanec_id: 2, firma_id: 1 },
-    { zamestnanec_id: 3, firma_id: 1 },
-    { zamestnanec_id: 3, firma_id: 2 },
-  ],
-  kategorie: [
-    { id: 1, nazev: "Potraviny", typ: "vydaj" },
-    { id: 2, nazev: "Nájem", typ: "vydaj" },
-    { id: 3, nazev: "Pohonné hmoty", typ: "vydaj" },
-    { id: 4, nazev: "Kancelářské potřeby", typ: "vydaj" },
-    { id: 5, nazev: "Tržba", typ: "prijem" },
-    { id: 6, nazev: "Vratka", typ: "oba" },
-    { id: 7, nazev: "Ostatní", typ: "oba" },
-  ],
-  transakce: [
-    { id: 1, zamestnanec_id: 1, firma_id: 1, typ: "prijem", kategorie_id: 5, dodavatel: "", popis: "Denní tržba – pátek", cena_bez_dph: 12400, cena_s_dph: 15004, typ_platby: "hotovost", priloha_url: null, created_at: "2026-04-07T18:30:00", storno: false, storno_pozn: null, edited: false, edit_pozn: null, is_vklad: false },
-    { id: 2, zamestnanec_id: 1, firma_id: 1, typ: "vydaj", kategorie_id: 1, dodavatel: "Makro", popis: "Nákup surovin – hovězí, bulky", cena_bez_dph: 4200, cena_s_dph: 5082, typ_platby: "hotovost", priloha_url: null, created_at: "2026-04-07T09:15:00", storno: false, storno_pozn: null, edited: false, edit_pozn: null, is_vklad: false },
-    { id: 3, zamestnanec_id: 2, firma_id: 1, typ: "vydaj", kategorie_id: 3, dodavatel: "Shell", popis: "Nafta do foodtrucku", cena_bez_dph: 1800, cena_s_dph: 2178, typ_platby: "karta", priloha_url: null, created_at: "2026-04-06T14:20:00", storno: false, storno_pozn: null, edited: false, edit_pozn: null, is_vklad: false },
-    { id: 4, zamestnanec_id: 3, firma_id: 2, typ: "vydaj", kategorie_id: 4, dodavatel: "Alza", popis: "Toner do tiskárny", cena_bez_dph: 890, cena_s_dph: 1076.9, typ_platby: "karta", priloha_url: null, created_at: "2026-04-06T10:00:00", storno: false, storno_pozn: null, edited: false, edit_pozn: null, is_vklad: false },
-    { id: 5, zamestnanec_id: 1, firma_id: 1, typ: "prijem", kategorie_id: 5, dodavatel: "", popis: "Denní tržba – čtvrtek", cena_bez_dph: 9800, cena_s_dph: 11858, typ_platby: "hotovost", priloha_url: null, created_at: "2026-04-06T19:00:00", storno: false, storno_pozn: null, edited: false, edit_pozn: null, is_vklad: false },
-    { id: 6, zamestnanec_id: 1, firma_id: 1, typ: "prijem", kategorie_id: null, dodavatel: "", popis: "Počáteční vklad – ranní pokladna", cena_bez_dph: 5000, cena_s_dph: 5000, typ_platby: "hotovost", priloha_url: null, created_at: "2026-04-07T07:00:00", storno: false, storno_pozn: null, edited: false, edit_pozn: null, is_vklad: true },
-  ],
-  notifications: [],
+const sbHeaders = {
+  "Content-Type": "application/json",
+  "apikey": SB_KEY,
+  "Authorization": `Bearer ${SB_KEY}`,
+  "Prefer": "return=representation",
 };
 
+// Základní REST volání na Supabase
+async function sbGet(table, params = "") {
+  const res = await fetch(`${SB_URL}/rest/v1/${table}${params ? "?" + params : ""}`, {
+    headers: { ...sbHeaders, "Prefer": "return=representation" },
+  });
+  if (!res.ok) throw new Error(`GET ${table}: ${res.status} ${await res.text()}`);
+  return res.json();
+}
+
+async function sbPost(table, body) {
+  const res = await fetch(`${SB_URL}/rest/v1/${table}`, {
+    method: "POST",
+    headers: sbHeaders,
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`POST ${table}: ${res.status} ${await res.text()}`);
+  const data = await res.json();
+  return Array.isArray(data) ? data[0] : data;
+}
+
+async function sbPatch(table, filter, body) {
+  const res = await fetch(`${SB_URL}/rest/v1/${table}?${filter}`, {
+    method: "PATCH",
+    headers: sbHeaders,
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`PATCH ${table}: ${res.status} ${await res.text()}`);
+  const data = await res.json();
+  return Array.isArray(data) ? data[0] : data;
+}
+
+async function sbDelete(table, filter) {
+  const res = await fetch(`${SB_URL}/rest/v1/${table}?${filter}`, {
+    method: "DELETE",
+    headers: { ...sbHeaders, "Prefer": "return=minimal" },
+  });
+  if (!res.ok) throw new Error(`DELETE ${table}: ${res.status} ${await res.text()}`);
+  return true;
+}
+
 // ============================================================
-// STORE
+// GOOGLE SHEETS & DRIVE (simulované – nahradit Vercel Edge fn.)
+// Service account: pokladni-denik-export@pokladni-denik.iam.gserviceaccount.com
+// ============================================================
+const SHEET_HEADERS = ["Datum", "Čas", "Typ", "Typ platby", "Kategorie", "Dodavatel/Odběratel", "Popis", "Bez DPH", "S DPH", "Vklad/Výběr", "Storno"];
+const DRIVE_ROOT_FOLDER_ID = "1ZO5cektWhTT6AZTQJ3GiIuJHOyJMluAv";
+
+// ============================================================
+// STORE – Supabase REST API
 // ============================================================
 function useStore() {
-  const [firmy, setFirmy] = useState(SEED.firmy);
-  const [zam, setZam] = useState(SEED.zamestnanci);
-  const [asgn, setAsgn] = useState(SEED.assignments);
-  const [kat, setKat] = useState(SEED.kategorie);
-  const [tx, setTx] = useState(SEED.transakce);
-  const [notifs, setNotifs] = useState(SEED.notifications);
+  const [firmy, setFirmy] = useState([]);
+  const [zam, setZam] = useState([]);
+  const [asgn, setAsgn] = useState([]);
+  const [kat, setKat] = useState([]);
+  const [tx, setTx] = useState([]);
+  const [notifs, setNotifs] = useState([]);
   const [sheetsLog, setSheetsLog] = useState([]);
   const [driveLog, setDriveLog] = useState([]);
-  // Limits: { id, typ: "denny"|"mesicni", target_type: "zamestnanec"|"kategorie", target_id, limit_czk }
   const [limits, setLimits] = useState([]);
-  const nid = useRef(100);
-  const g = () => ++nid.current;
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const localId = useRef(-1);
+  const lid = () => { localId.current -= 1; return localId.current; }; // temp negativní ID před fetch
 
-  // Simulated Google Sheets export (will be replaced with real API on Vercel)
+  // ── INITIAL LOAD ──────────────────────────────────────────
+  const fetchAll = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [fRes, zRes, aRes, kRes, tRes, nRes, lRes] = await Promise.all([
+        sbGet("firmy", "order=nazev.asc"),
+        sbGet("zamestnanci", "order=jmeno.asc"),
+        sbGet("zamestnanec_firma"),
+        sbGet("kategorie", "order=nazev.asc"),
+        sbGet("transakce", "order=created_at.desc&limit=500"),
+        sbGet("notifikace", "order=created_at.desc&limit=100"),
+        sbGet("limity"),
+      ]);
+      setFirmy(fRes);
+      setZam(zRes);
+      // Normalizuj assignments → {zamestnanec_id, firma_id}
+      setAsgn(aRes.map(r => ({ zamestnanec_id: r.zamestnanec_id, firma_id: r.firma_id })));
+      setKat(kRes);
+      setTx(tRes);
+      setNotifs(nRes.map(n => ({
+        id: n.id, type: n.typ, tx_id: n.tx_id,
+        user_id: n.user_id, popis: n.popis, pozn: n.pozn,
+        time: n.created_at, read: n.read,
+      })));
+      setLimits(lRes);
+    } catch (e) {
+      setError(e.message);
+      console.error("Supabase fetchAll error:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // ── GOOGLE SHEETS (simulováno) ────────────────────────────
   const exportToSheets = (txData, zamName, firmaId, firmaNazev, katName) => {
     const firma = firmy.find(f => f.id === firmaId);
     if (!firma || !firma.spreadsheet_id) return null;
-    const sheetName = zamName;
     const row = [
       new Date(txData.created_at).toLocaleDateString("cs-CZ", { day: "2-digit", month: "2-digit", year: "2-digit" }),
       new Date(txData.created_at).toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" }),
       txData.typ === "prijem" ? "Příjem" : "Výdaj",
       txData.typ_platby === "hotovost" ? "Hotovost" : "Karta",
-      katName || "—",
-      txData.dodavatel || "—",
-      txData.popis || "—",
+      katName || "—", txData.dodavatel || "—", txData.popis || "—",
       txData.cena_bez_dph, txData.cena_s_dph,
       txData.is_vklad ? (txData.typ === "prijem" ? "Vklad" : "Výběr") : "",
       txData.storno ? "ANO" : "",
     ];
     const logEntry = {
-      id: g(), time: new Date().toISOString(),
+      id: lid(), time: new Date().toISOString(),
       spreadsheet: firmaNazev, spreadsheetId: firma.spreadsheet_id,
-      sheet: sheetName, row, status: "simulated",
+      sheet: zamName, row, status: "simulated",
     };
     setSheetsLog(p => [logEntry, ...p]);
     return logEntry;
   };
 
-  // Simulated Google Drive upload (will be replaced with real API on Vercel)
+  // ── GOOGLE DRIVE (simulováno) ─────────────────────────────
   const uploadToDrive = (fileName, zamName, firmaNazev) => {
     if (!fileName || !DRIVE_ROOT_FOLDER_ID) return null;
-    const path = `${firmaNazev} / ${zamName} / ${fileName}`;
     const logEntry = {
-      id: g(), time: new Date().toISOString(),
+      id: lid(), time: new Date().toISOString(),
       fileName, firma: firmaNazev, zamestnanec: zamName,
-      path, rootFolder: DRIVE_ROOT_FOLDER_ID, status: "simulated",
+      path: `${firmaNazev} / ${zamName} / ${fileName}`,
+      rootFolder: DRIVE_ROOT_FOLDER_ID, status: "simulated",
     };
     setDriveLog(p => [logEntry, ...p]);
     return logEntry;
   };
 
+  // ── FIRMY ─────────────────────────────────────────────────
+  const addFirma = async (nazev, spreadsheet_id) => {
+    const row = await sbPost("firmy", { nazev, spreadsheet_id: spreadsheet_id || null });
+    setFirmy(p => [...p, row]);
+    return row;
+  };
+  const updateFirma = async (id, d) => {
+    const row = await sbPatch("firmy", `id=eq.${id}`, d);
+    setFirmy(p => p.map(x => x.id === id ? { ...x, ...row } : x));
+    return row;
+  };
+  const delFirma = async (id) => {
+    await sbDelete("zamestnanec_firma", `firma_id=eq.${id}`);
+    await sbDelete("firmy", `id=eq.${id}`);
+    setFirmy(p => p.filter(x => x.id !== id));
+    setAsgn(p => p.filter(x => x.firma_id !== id));
+  };
+
+  // ── ZAMĚSTNANCI ───────────────────────────────────────────
+  const addZam = async (z) => {
+    const row = await sbPost("zamestnanci", { jmeno: z.jmeno, pin: z.pin, role: z.role });
+    setZam(p => [...p, row]);
+    return row;
+  };
+  const updateZam = async (id, d) => {
+    const row = await sbPatch("zamestnanci", `id=eq.${id}`, d);
+    setZam(p => p.map(x => x.id === id ? { ...x, ...row } : x));
+    return row;
+  };
+  const delZam = async (id) => {
+    await sbDelete("zamestnanec_firma", `zamestnanec_id=eq.${id}`);
+    await sbDelete("zamestnanci", `id=eq.${id}`);
+    setZam(p => p.filter(x => x.id !== id));
+    setAsgn(p => p.filter(x => x.zamestnanec_id !== id));
+  };
+  const toggleAsgn = async (zId, fId) => {
+    const has = asgn.find(x => x.zamestnanec_id === zId && x.firma_id === fId);
+    if (has) {
+      await sbDelete("zamestnanec_firma", `zamestnanec_id=eq.${zId}&firma_id=eq.${fId}`);
+      setAsgn(p => p.filter(x => !(x.zamestnanec_id === zId && x.firma_id === fId)));
+    } else {
+      await sbPost("zamestnanec_firma", { zamestnanec_id: zId, firma_id: fId });
+      setAsgn(p => [...p, { zamestnanec_id: zId, firma_id: fId }]);
+    }
+  };
+
+  // ── KATEGORIE ─────────────────────────────────────────────
+  const addKat = async (k) => {
+    const row = await sbPost("kategorie", { nazev: k.nazev, typ: k.typ });
+    setKat(p => [...p, row]);
+    return row;
+  };
+  const delKat = async (id) => {
+    await sbDelete("kategorie", `id=eq.${id}`);
+    setKat(p => p.filter(x => x.id !== id));
+  };
+
+  // ── TRANSAKCE ─────────────────────────────────────────────
+  const addTx = async (t) => {
+    const payload = {
+      zamestnanec_id: t.zamestnanec_id,
+      firma_id: t.firma_id,
+      typ: t.typ,
+      kategorie_id: t.kategorie_id || null,
+      dodavatel: t.dodavatel || null,
+      popis: t.popis || null,
+      cena_bez_dph: Number(t.cena_bez_dph),
+      cena_s_dph: Number(t.cena_s_dph),
+      typ_platby: t.typ_platby,
+      priloha_url: t.priloha_url || null,
+      is_vklad: t.is_vklad || false,
+      storno: false,
+      storno_pozn: null,
+      edited: false,
+      edit_pozn: null,
+      approved: false,
+    };
+    const row = await sbPost("transakce", payload);
+    // Zapiš historii
+    await sbPost("transakce_historie", {
+      transakce_id: row.id, action: "vytvoreno",
+      user_id: t.zamestnanec_id, pozn: null, before_data: null,
+    }).catch(() => {});
+    setTx(p => [row, ...p]);
+    return row;
+  };
+
+  const stornoTx = async (id, pozn, userId) => {
+    const old = tx.find(x => x.id === id);
+    const row = await sbPatch("transakce", `id=eq.${id}`, { storno: true, storno_pozn: pozn });
+    await sbPost("transakce_historie", {
+      transakce_id: id, action: "storno",
+      user_id: userId, pozn, before_data: null,
+    }).catch(() => {});
+    // Notifikace
+    const notif = await sbPost("notifikace", {
+      typ: "storno", tx_id: id, user_id: userId,
+      popis: old?.popis || null, pozn, read: false,
+    }).catch(() => null);
+    setTx(p => p.map(x => x.id === id ? { ...x, storno: true, storno_pozn: pozn } : x));
+    if (notif) setNotifs(p => [{
+      id: notif.id, type: "storno", tx_id: id,
+      user_id: userId, popis: old?.popis, pozn,
+      time: notif.created_at, read: false,
+    }, ...p]);
+  };
+
+  const editTx = async (id, changes, pozn, userId) => {
+    const old = tx.find(x => x.id === id);
+    const snapshot = old ? {
+      popis: old.popis, dodavatel: old.dodavatel,
+      cena_bez_dph: old.cena_bez_dph, cena_s_dph: old.cena_s_dph,
+    } : null;
+    const row = await sbPatch("transakce", `id=eq.${id}`, { ...changes, edited: true, edit_pozn: pozn });
+    await sbPost("transakce_historie", {
+      transakce_id: id, action: "uprava",
+      user_id: userId, pozn, before_data: snapshot,
+    }).catch(() => {});
+    const notif = await sbPost("notifikace", {
+      typ: "edit", tx_id: id, user_id: userId,
+      popis: old?.popis || null, pozn, read: false,
+    }).catch(() => null);
+    setTx(p => p.map(x => x.id === id ? { ...x, ...row } : x));
+    if (notif) setNotifs(p => [{
+      id: notif.id, type: "edit", tx_id: id,
+      user_id: userId, popis: old?.popis, pozn,
+      time: notif.created_at, read: false,
+    }, ...p]);
+  };
+
+  const approveTx = async (id, userId) => {
+    const row = await sbPatch("transakce", `id=eq.${id}`, { approved: true });
+    await sbPost("transakce_historie", {
+      transakce_id: id, action: "schvaleno",
+      user_id: userId, pozn: null, before_data: null,
+    }).catch(() => {});
+    setTx(p => p.map(x => x.id === id ? { ...x, approved: true } : x));
+  };
+
+  // ── NOTIFIKACE ────────────────────────────────────────────
+  const markNotifsRead = async () => {
+    await sbPatch("notifikace", "read=eq.false", { read: true }).catch(() => {});
+    setNotifs(p => p.map(x => ({ ...x, read: true })));
+  };
+
+  // ── LIMITY ────────────────────────────────────────────────
+  const addLimit = async (l) => {
+    const row = await sbPost("limity", {
+      typ: l.typ, target_type: l.target_type,
+      target_id: l.target_id, limit_czk: l.limit_czk,
+    });
+    setLimits(p => [...p, row]);
+    return row;
+  };
+  const delLimit = async (id) => {
+    await sbDelete("limity", `id=eq.${id}`);
+    setLimits(p => p.filter(x => x.id !== id));
+  };
+
+  // ── KONTROLA LIMITŮ (pure, bez async) ─────────────────────
+  const checkLimits = (txData) => {
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const warnings = [];
+    limits.forEach(lim => {
+      const cutoff = lim.typ === "denny" ? startOfDay : startOfMonth;
+      const relevantTx = tx.filter(t => !t.storno && t.typ === "vydaj" && new Date(t.created_at) >= cutoff);
+      let spent = 0;
+      if (lim.target_type === "zamestnanec") {
+        if (txData.zamestnanec_id !== lim.target_id) return;
+        spent = relevantTx.filter(t => t.zamestnanec_id === lim.target_id).reduce((s, t) => s + Number(t.cena_s_dph), 0);
+      } else if (lim.target_type === "kategorie") {
+        if (txData.kategorie_id !== lim.target_id) return;
+        spent = relevantTx.filter(t => t.kategorie_id === lim.target_id).reduce((s, t) => s + Number(t.cena_s_dph), 0);
+      }
+      const newTotal = spent + Number(txData.cena_s_dph || 0);
+      if (newTotal > lim.limit_czk) {
+        const targetName = lim.target_type === "zamestnanec"
+          ? (zam.find(z => z.id === lim.target_id)?.jmeno || "?")
+          : (kat.find(k => k.id === lim.target_id)?.nazev || "?");
+        warnings.push({ limit: lim, spent, newTotal, targetName });
+      }
+    });
+    return warnings;
+  };
+
+  // ── DUPLICATE CHECK (pure) ────────────────────────────────
+  const isDuplicate = (userId, firmaId, amount) => {
+    const cutoff = Date.now() - 120000;
+    return tx.some(t =>
+      !t.storno && t.zamestnanec_id === userId &&
+      t.firma_id === firmaId && Number(t.cena_s_dph) === Number(amount) &&
+      new Date(t.created_at).getTime() > cutoff
+    );
+  };
+
   return {
-    firmy, zamestnanci: zam, assignments: asgn, kategorie: kat, transakce: tx, notifs, sheetsLog, driveLog, limits, exportToSheets, uploadToDrive,
-    addLimit: l => setLimits(p => [...p, { ...l, id: g() }]),
-    delLimit: id => setLimits(p => p.filter(x => x.id !== id)),
-    checkLimits: (txData) => {
-      // Returns array of exceeded limits
-      const now = new Date();
-      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const warnings = [];
-      limits.forEach(lim => {
-        const cutoff = lim.typ === "denny" ? startOfDay : startOfMonth;
-        const relevantTx = tx.filter(t => !t.storno && t.typ === "vydaj" && new Date(t.created_at) >= cutoff);
-        let spent = 0;
-        if (lim.target_type === "zamestnanec") {
-          spent = relevantTx.filter(t => t.zamestnanec_id === lim.target_id).reduce((s, t) => s + Number(t.cena_s_dph), 0);
-          if (txData.zamestnanec_id !== lim.target_id) return;
-        } else if (lim.target_type === "kategorie") {
-          spent = relevantTx.filter(t => t.kategorie_id === lim.target_id).reduce((s, t) => s + Number(t.cena_s_dph), 0);
-          if (txData.kategorie_id !== lim.target_id) return;
-        }
-        const newTotal = spent + Number(txData.cena_s_dph || 0);
-        if (newTotal > lim.limit_czk) {
-          const targetName = lim.target_type === "zamestnanec" ? (zam.find(z => z.id === lim.target_id)?.jmeno || "?") : (kat.find(k => k.id === lim.target_id)?.nazev || "?");
-          warnings.push({ limit: lim, spent, newTotal, targetName });
-        }
-      });
-      return warnings;
-    },
-    addFirma: (n, sid) => { setFirmy(p => [...p, { id: g(), nazev: n, spreadsheet_id: sid || "" }]); },
-    updateFirma: (id, d) => setFirmy(p => p.map(x => x.id === id ? { ...x, ...d } : x)),
-    delFirma: id => { setFirmy(p => p.filter(x => x.id !== id)); setAsgn(p => p.filter(x => x.firma_id !== id)); },
-    addZam: z => { setZam(p => [...p, { ...z, id: g() }]); },
-    updateZam: (id, d) => setZam(p => p.map(x => x.id === id ? { ...x, ...d } : x)),
-    delZam: id => { setZam(p => p.filter(x => x.id !== id)); setAsgn(p => p.filter(x => x.zamestnanec_id !== id)); },
-    toggleAsgn: (zId, fId) => {
-      setAsgn(p => {
-        const has = p.find(x => x.zamestnanec_id === zId && x.firma_id === fId);
-        return has ? p.filter(x => !(x.zamestnanec_id === zId && x.firma_id === fId)) : [...p, { zamestnanec_id: zId, firma_id: fId }];
-      });
-    },
-    addKat: k => { setKat(p => [...p, { ...k, id: g() }]); },
-    delKat: id => setKat(p => p.filter(x => x.id !== id)),
-    addTx: t => {
-      const now = new Date().toISOString();
-      setTx(p => [{ ...t, id: g(), created_at: now, storno: false, storno_pozn: null, edited: false, edit_pozn: null, approved: false, history: [{ action: "vytvoreno", time: now, user_id: t.zamestnanec_id }] }, ...p]);
-    },
-    stornoTx: (id, pozn, userId) => {
-      const now = new Date().toISOString();
-      setTx(p => p.map(x => x.id === id ? { ...x, storno: true, storno_pozn: pozn, history: [...(x.history || []), { action: "storno", time: now, user_id: userId, pozn }] } : x));
-      const t = tx.find(x => x.id === id);
-      if (t) setNotifs(p => [{ id: g(), type: "storno", tx_id: id, user_id: userId, popis: t.popis, pozn, time: now, read: false }, ...p]);
-    },
-    editTx: (id, changes, pozn, userId) => {
-      const now = new Date().toISOString();
-      const old = tx.find(x => x.id === id);
-      const snapshot = old ? { popis: old.popis, dodavatel: old.dodavatel, cena_bez_dph: old.cena_bez_dph, cena_s_dph: old.cena_s_dph } : {};
-      setTx(p => p.map(x => x.id === id ? { ...x, ...changes, edited: true, edit_pozn: pozn, history: [...(x.history || []), { action: "uprava", time: now, user_id: userId, pozn, before: snapshot }] } : x));
-      if (old) setNotifs(p => [{ id: g(), type: "edit", tx_id: id, user_id: userId, popis: old.popis, pozn, time: now, read: false }, ...p]);
-    },
-    approveTx: (id, userId) => {
-      const now = new Date().toISOString();
-      setTx(p => p.map(x => x.id === id ? { ...x, approved: true, history: [...(x.history || []), { action: "schvaleno", time: now, user_id: userId }] } : x));
-    },
-    markNotifsRead: () => setNotifs(p => p.map(x => ({ ...x, read: true }))),
-    // Check duplicate: same user, firm, amount within 2 minutes
-    isDuplicate: (userId, firmaId, amount) => {
-      const cutoff = Date.now() - 120000;
-      return tx.some(t => !t.storno && t.zamestnanec_id === userId && t.firma_id === firmaId && Number(t.cena_s_dph) === Number(amount) && new Date(t.created_at).getTime() > cutoff);
-    },
+    // data
+    firmy, zamestnanci: zam, assignments: asgn, kategorie: kat,
+    transakce: tx, notifs, sheetsLog, driveLog, limits,
+    loading, error,
+    // helpers
+    refetch: fetchAll,
+    exportToSheets, uploadToDrive,
+    checkLimits, isDuplicate,
+    // async CRUD
+    addFirma, updateFirma, delFirma,
+    addZam, updateZam, delZam, toggleAsgn,
+    addKat, delKat,
+    addTx, stornoTx, editTx, approveTx,
+    markNotifsRead,
+    addLimit, delLimit,
   };
 }
 
@@ -298,20 +479,45 @@ export default function App() {
 
   const isAdmin = user && (user.role === "superadmin" || user.role === "manazer");
 
+  const globalStyles = `
+    @keyframes tIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes fIn{from{opacity:0}to{opacity:1}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    input:focus,select:focus{border-color:${P.accent}!important}
+    input::placeholder{color:${P.ink3}}
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0}
+    table{border-collapse:collapse}
+    select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b6b64' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+    @media(max-width:500px){.hide-mobile{display:none!important}}
+  `;
+
+  if (store.loading) return (
+    <div style={{ fontFamily: ff, background: P.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
+      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+      <style>{globalStyles}</style>
+      <div style={{ width: 36, height: 36, border: `3px solid ${P.border}`, borderTopColor: P.accent, borderRadius: "50%", animation: "spin .8s linear infinite" }} />
+      <p style={{ margin: 0, fontSize: 14, color: P.ink2, fontWeight: 500 }}>Načítání dat…</p>
+    </div>
+  );
+
+  if (store.error) return (
+    <div style={{ fontFamily: ff, background: P.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+      <style>{globalStyles}</style>
+      <div style={{ ...sC, maxWidth: 420, width: "100%", textAlign: "center" }}>
+        <div style={{ fontSize: 32, marginBottom: 12 }}>⚠️</div>
+        <h2 style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 800 }}>Chyba připojení k databázi</h2>
+        <p style={{ margin: "0 0 16px", fontSize: 13, color: P.ink2, fontFamily: fm, wordBreak: "break-all" }}>{store.error}</p>
+        <button style={{ ...sB, background: P.accent, color: "#fff", width: "100%", justifyContent: "center" }} onClick={store.refetch}>Zkusit znovu</button>
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ fontFamily: ff, background: P.bg, minHeight: "100vh", color: P.ink }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
-      <style>{`
-        @keyframes tIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes fIn{from{opacity:0}to{opacity:1}}
-        input:focus,select:focus{border-color:${P.accent}!important}
-        input::placeholder{color:${P.ink3}}
-        *,*::before,*::after{box-sizing:border-box}
-        body{margin:0}
-        table{border-collapse:collapse}
-        select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b6b64' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
-        @media(max-width:500px){.hide-mobile{display:none!important}}
-      `}</style>
+      <style>{globalStyles}</style>
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} key={toast.k} />}
       {!user ? (
         <Login store={store} onLogin={u => { setUser(u); setScr(isAdminRole(u) ? "admin" : "home"); }} nt={nt} />
@@ -512,14 +718,17 @@ function VkladForm({ user, store, firmy, defF, onBack, nt, typ }) {
     setConfirm(true);
   };
 
-  const doSave = () => {
-    const now = new Date().toISOString();
-    const txData = { zamestnanec_id: user.id, firma_id: Number(firma), typ, kategorie_id: null, dodavatel: "", popis: pozn.trim(), cena_bez_dph: Number(castka), cena_s_dph: Number(castka), typ_platby: "hotovost", priloha_url: fileName || null, is_vklad: true, created_at: now };
-    store.addTx(txData);
-    const firmaNazev = store.firmy.find(x => x.id === Number(firma))?.nazev || "";
-    store.exportToSheets(txData, user.jmeno, Number(firma), firmaNazev, null);
-    if (fileName) store.uploadToDrive(fileName, user.jmeno, firmaNazev);
-    setShowSuccess(true);
+  const doSave = async () => {
+    const txData = { zamestnanec_id: user.id, firma_id: Number(firma), typ, kategorie_id: null, dodavatel: "", popis: pozn.trim(), cena_bez_dph: Number(castka), cena_s_dph: Number(castka), typ_platby: "hotovost", priloha_url: fileName || null, is_vklad: true };
+    try {
+      const saved = await store.addTx(txData);
+      const firmaNazev = store.firmy.find(x => x.id === Number(firma))?.nazev || "";
+      store.exportToSheets(saved || txData, user.jmeno, Number(firma), firmaNazev, null);
+      if (fileName) store.uploadToDrive(fileName, user.jmeno, firmaNazev);
+      setShowSuccess(true);
+    } catch (e) {
+      nt("Chyba při ukládání: " + e.message, "error");
+    }
   };
 
   return (
@@ -627,15 +836,18 @@ function TxForm({ user, store, firmy, defF, onBack, nt }) {
     setConfirm(true);
   };
 
-  const doSave = () => {
-    const now = new Date().toISOString();
-    const txData = { zamestnanec_id: user.id, firma_id: Number(f.firma_id), typ: f.typ, kategorie_id: f.kategorie_id ? Number(f.kategorie_id) : null, dodavatel: f.dodavatel || null, popis: f.popis || null, cena_bez_dph: Number(f.bez) || 0, cena_s_dph: Number(f.sdph), typ_platby: f.platba, priloha_url: fileName || null, is_vklad: false, created_at: now };
-    store.addTx(txData);
-    const katName = f.kategorie_id ? store.kategorie.find(k => k.id === Number(f.kategorie_id))?.nazev : null;
-    const firmaNazev = store.firmy.find(x => x.id === Number(f.firma_id))?.nazev || "";
-    store.exportToSheets(txData, user.jmeno, Number(f.firma_id), firmaNazev, katName);
-    if (fileName) store.uploadToDrive(fileName, user.jmeno, firmaNazev);
-    setShowSuccess(true);
+  const doSave = async () => {
+    const txData = { zamestnanec_id: user.id, firma_id: Number(f.firma_id), typ: f.typ, kategorie_id: f.kategorie_id ? Number(f.kategorie_id) : null, dodavatel: f.dodavatel || null, popis: f.popis || null, cena_bez_dph: Number(f.bez) || 0, cena_s_dph: Number(f.sdph), typ_platby: f.platba, priloha_url: fileName || null, is_vklad: false };
+    try {
+      const saved = await store.addTx(txData);
+      const katName = f.kategorie_id ? store.kategorie.find(k => k.id === Number(f.kategorie_id))?.nazev : null;
+      const firmaNazev = store.firmy.find(x => x.id === Number(f.firma_id))?.nazev || "";
+      store.exportToSheets(saved || txData, user.jmeno, Number(f.firma_id), firmaNazev, katName);
+      if (fileName) store.uploadToDrive(fileName, user.jmeno, firmaNazev);
+      setShowSuccess(true);
+    } catch (e) {
+      nt("Chyba při ukládání: " + e.message, "error");
+    }
   };
 
   const tog = (key, val, col) => ({
@@ -816,7 +1028,7 @@ function OverviewTab({ store, nt, user, visibleFirmyIds }) {
   return (
     <div>
       {/* Storno/Edit dialogs */}
-      {stornoId && <Prompt msg="Důvod storna:" placeholder="Proč transakci stornujete?" onOk={val => { store.stornoTx(stornoId, val, user.id); setStornoId(null); nt("Transakce stornována"); }} onCancel={() => setStornoId(null)} />}
+      {stornoId && <Prompt msg="Důvod storna:" placeholder="Proč transakci stornujete?" onOk={async val => { try { await store.stornoTx(stornoId, val, user.id); nt("Transakce stornována"); } catch(e) { nt("Chyba: "+e.message,"error"); } setStornoId(null); }} onCancel={() => setStornoId(null)} />}
       {editId && <EditDialog store={store} txId={editId} userId={user.id} onClose={() => setEditId(null)} nt={nt} />}
 
       {/* Balance cards */}
@@ -908,7 +1120,7 @@ function OverviewTab({ store, nt, user, visibleFirmyIds }) {
                 <td style={{ padding: "8px 8px", textAlign: "center" }}>
                   {t.approved
                     ? <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 99, background: P.greenBg, color: P.green }}>✓ Schváleno</span>
-                    : !t.storno && <button onClick={e => { e.stopPropagation(); store.approveTx(t.id, user.id); nt("Schváleno ✓"); }}
+                    : !t.storno && <button onClick={async e => { e.stopPropagation(); try { await store.approveTx(t.id, user.id); nt("Schváleno ✓"); } catch(err) { nt("Chyba: "+err.message,"error"); } }}
                         style={{ ...sB, fontSize: 10, padding: "2px 8px", background: "transparent", color: P.orange, border: `1px solid ${P.orange}`, borderRadius: 99 }}>Schválit</button>
                   }
                 </td>
@@ -1015,7 +1227,7 @@ function TxDetail({ store, txId, user, onClose, nt }) {
         {/* Approve button */}
         {!t.approved && !t.storno && (
           <button style={{ ...sB, background: P.green, color: "#fff", width: "100%", justifyContent: "center", padding: "10px", marginBottom: 16 }}
-            onClick={() => { store.approveTx(t.id, user.id); nt("Doklad schválen ✓"); }}>
+            onClick={async () => { try { await store.approveTx(t.id, user.id); nt("Doklad schválen ✓"); } catch(e) { nt("Chyba: "+e.message,"error"); } }}>
             ✓ Schválit transakci
           </button>
         )}
@@ -1184,11 +1396,13 @@ function DashboardTab({ store, visibleFirmyIds }) {
 function LimitsTab({ store, nt }) {
   const [form, setForm] = useState({ typ: "mesicni", target_type: "zamestnanec", target_id: "", limit_czk: "" });
 
-  const add = () => {
+  const add = async () => {
     if (!form.target_id || !form.limit_czk) return nt("Vyplňte cíl a limit", "error");
-    store.addLimit({ typ: form.typ, target_type: form.target_type, target_id: Number(form.target_id), limit_czk: Number(form.limit_czk) });
-    setForm({ typ: "mesicni", target_type: "zamestnanec", target_id: "", limit_czk: "" });
-    nt("Limit přidán ✓");
+    try {
+      await store.addLimit({ typ: form.typ, target_type: form.target_type, target_id: Number(form.target_id), limit_czk: Number(form.limit_czk) });
+      setForm({ typ: "mesicni", target_type: "zamestnanec", target_id: "", limit_czk: "" });
+      nt("Limit přidán ✓");
+    } catch(e) { nt("Chyba: "+e.message, "error"); }
   };
 
   const targetOptions = form.target_type === "zamestnanec" ? store.zamestnanci : store.kategorie;
@@ -1267,7 +1481,7 @@ function LimitsTab({ store, nt }) {
                     </span>
                     <span style={{ fontSize: 11, color: P.ink3 }}>{lim.target_type === "zamestnanec" ? "👤" : "🏷️"}</span>
                   </div>
-                  <button style={{ ...sB, background: P.red, color: "#fff", fontSize: 11, padding: "4px 10px" }} onClick={() => { store.delLimit(lim.id); nt("Limit odstraněn"); }}>Smazat</button>
+                  <button style={{ ...sB, background: P.red, color: "#fff", fontSize: 11, padding: "4px 10px" }} onClick={async () => { try { await store.delLimit(lim.id); nt("Limit odstraněn"); } catch(e) { nt("Chyba: "+e.message,"error"); } }}>Smazat</button>
                 </div>
                 {/* Progress bar */}
                 <div style={{ height: 8, background: "#f0f0ec", borderRadius: 4, overflow: "hidden", marginBottom: 6 }}>
@@ -1296,10 +1510,12 @@ function EditDialog({ store, txId, userId, onClose, nt }) {
   const [pozn, setPozn] = useState("");
   if (!t) return null;
 
-  const save = () => {
+  const save = async () => {
     if (!pozn.trim()) return nt("Vyplňte důvod úpravy", "error");
-    store.editTx(txId, f, pozn.trim(), userId);
-    nt("Transakce upravena"); onClose();
+    try {
+      await store.editTx(txId, f, pozn.trim(), userId);
+      nt("Transakce upravena"); onClose();
+    } catch(e) { nt("Chyba: "+e.message, "error"); }
   };
 
   return (
@@ -1464,12 +1680,14 @@ function NotifTab({ store }) {
 function EmpTab({ store, nt }) {
   const [form, setForm] = useState({ jmeno: "", pin: "", role: "zamestnanec" });
   const [editId, setEditId] = useState(null);
-  const save = () => {
+  const save = async () => {
     if (!form.jmeno.trim() || !form.pin.trim()) return nt("Vyplňte jméno a PIN", "error");
     if (form.pin.length !== 4 || !/^\d+$/.test(form.pin)) return nt("PIN musí být 4 číslice", "error");
-    if (editId) { store.updateZam(editId, form); nt("Zaměstnanec upraven"); }
-    else { store.addZam(form); nt("Zaměstnanec přidán"); }
-    setForm({ jmeno: "", pin: "", role: "zamestnanec" }); setEditId(null);
+    try {
+      if (editId) { await store.updateZam(editId, form); nt("Zaměstnanec upraven"); }
+      else { await store.addZam(form); nt("Zaměstnanec přidán"); }
+      setForm({ jmeno: "", pin: "", role: "zamestnanec" }); setEditId(null);
+    } catch(e) { nt("Chyba: "+e.message, "error"); }
   };
   return (
     <div>
@@ -1504,7 +1722,7 @@ function EmpTab({ store, nt }) {
                 </div>
                 <div style={{ display: "flex", gap: 4 }}>
                   <button style={{ ...sB, background: "transparent", color: P.ink2, padding: "6px 10px" }} onClick={() => { setEditId(z.id); setForm({ jmeno: z.jmeno, pin: z.pin, role: z.role }); }}>Upravit</button>
-                  <button style={{ ...sB, background: P.red, color: "#fff", fontSize: 12, padding: "6px 12px" }} onClick={() => { store.delZam(z.id); nt("Smazáno"); }}>Smazat</button>
+                  <button style={{ ...sB, background: P.red, color: "#fff", fontSize: 12, padding: "6px 12px" }} onClick={async () => { try { await store.delZam(z.id); nt("Smazáno"); } catch(e) { nt("Chyba: "+e.message,"error"); } }}>Smazat</button>
                 </div>
               </div>
               {store.firmy.length > 0 && (
@@ -1512,7 +1730,7 @@ function EmpTab({ store, nt }) {
                   {store.firmy.map(f => {
                     const on = myF.includes(f.id);
                     return (
-                      <button key={f.id} onClick={() => store.toggleAsgn(z.id, f.id)} style={{
+                      <button key={f.id} onClick={async () => { try { await store.toggleAsgn(z.id, f.id); } catch(e) { nt("Chyba: "+e.message,"error"); } }} style={{
                         ...sB, fontSize: 11, padding: "3px 10px", borderRadius: 99,
                         background: on ? P.accent : "transparent", color: on ? "#fff" : P.ink3,
                         border: `1.5px solid ${on ? P.accent : P.border}`,
@@ -1539,17 +1757,16 @@ function CompTab({ store, nt }) {
   const [editNazev, setEditNazev] = useState("");
   const [editSid, setEditSid] = useState("");
 
-  const add = () => {
+  const add = async () => {
     if (!nazev.trim()) return;
-    store.addFirma(nazev.trim(), sid.trim());
-    setNazev(""); setSid("");
-    nt("Firma přidána");
+    try { await store.addFirma(nazev.trim(), sid.trim()); setNazev(""); setSid(""); nt("Firma přidána"); }
+    catch(e) { nt("Chyba: "+e.message, "error"); }
   };
 
   const startEdit = (f) => { setEditId(f.id); setEditNazev(f.nazev); setEditSid(f.spreadsheet_id || ""); };
-  const saveEdit = () => {
-    store.updateFirma(editId, { nazev: editNazev, spreadsheet_id: editSid.trim() });
-    setEditId(null); nt("Firma aktualizována");
+  const saveEdit = async () => {
+    try { await store.updateFirma(editId, { nazev: editNazev, spreadsheet_id: editSid.trim() }); setEditId(null); nt("Firma aktualizována"); }
+    catch(e) { nt("Chyba: "+e.message, "error"); }
   };
 
   return (
@@ -1588,7 +1805,7 @@ function CompTab({ store, nt }) {
                   <span style={{ fontWeight: 600 }}>{f.nazev}</span>
                   <div style={{ display: "flex", gap: 4 }}>
                     <button style={{ ...sB, background: "transparent", color: P.ink2, padding: "6px 10px" }} onClick={() => startEdit(f)}>Upravit</button>
-                    <button style={{ ...sB, background: P.red, color: "#fff", fontSize: 12, padding: "6px 12px" }} onClick={() => { store.delFirma(f.id); nt("Smazáno"); }}>Smazat</button>
+                    <button style={{ ...sB, background: P.red, color: "#fff", fontSize: 12, padding: "6px 12px" }} onClick={async () => { try { await store.delFirma(f.id); nt("Smazáno"); } catch(e) { nt("Chyba: "+e.message,"error"); } }}>Smazat</button>
                   </div>
                 </div>
                 {f.spreadsheet_id ? (
@@ -1613,7 +1830,7 @@ function CompTab({ store, nt }) {
 
 function CatTab({ store, nt }) {
   const [form, setForm] = useState({ nazev: "", typ: "oba" });
-  const add = () => { if (!form.nazev.trim()) return; store.addKat({ nazev: form.nazev.trim(), typ: form.typ }); setForm({ nazev: "", typ: "oba" }); nt("Kategorie přidána"); };
+  const add = async () => { if (!form.nazev.trim()) return; try { await store.addKat({ nazev: form.nazev.trim(), typ: form.typ }); setForm({ nazev: "", typ: "oba" }); nt("Kategorie přidána"); } catch(e) { nt("Chyba: "+e.message,"error"); } };
   const tl = { prijem: "Příjem", vydaj: "Výdaj", oba: "Obojí" };
   const tc = { prijem: P.green, vydaj: P.red, oba: P.blue };
   return (
@@ -1637,7 +1854,7 @@ function CatTab({ store, nt }) {
               <span style={{ fontWeight: 600 }}>{k.nazev}</span>
               <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 99, background: tc[k.typ] + "15", color: tc[k.typ] }}>{tl[k.typ]}</span>
             </div>
-            <button style={{ ...sB, background: P.red, color: "#fff", fontSize: 12, padding: "6px 12px" }} onClick={() => { store.delKat(k.id); nt("Smazáno"); }}>Smazat</button>
+            <button style={{ ...sB, background: P.red, color: "#fff", fontSize: 12, padding: "6px 12px" }} onClick={async () => { try { await store.delKat(k.id); nt("Smazáno"); } catch(e) { nt("Chyba: "+e.message,"error"); } }}>Smazat</button>
           </div>
         ))}
       </div>
