@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 
 /*
-  POKLADNÃ DENÃK â Helenka 1.0
-  Supabase backend â vÅ¡echna data persistent v DB.
-  Role: superadmin (vÅ¡e), manaÅ¾er (jen pÅiÅazenÃ© firmy), zamÄstnanec.
+  POKLADNÍ DENÍK — Helenka 1.0
+  Supabase backend – všechna data persistent v DB.
+  Role: superadmin (vše), manažer (jen přiřazené firmy), zaměstnanec.
 */
 
 // ============================================================
@@ -19,7 +19,7 @@ const sbHeaders = {
   "Prefer": "return=representation",
 };
 
-// ZÃ¡kladnÃ­ REST volÃ¡nÃ­ na Supabase
+// Základní REST volání na Supabase
 async function sbGet(table, params = "") {
   const res = await fetch(`${SB_URL}/rest/v1/${table}${params ? "?" + params : ""}`, {
     headers: { ...sbHeaders, "Prefer": "return=representation" },
@@ -60,7 +60,6 @@ async function sbDelete(table, filter) {
 }
 
 // Upload souboru do Supabase Storage bucket "receipts"
-// Vrátí veřejnou URL nebo null při chybě
 async function sbUploadFile(file, path) {
   const res = await fetch(`${SB_URL}/storage/v1/object/receipts/${path}`, {
     method: "POST",
@@ -73,20 +72,18 @@ async function sbUploadFile(file, path) {
     body: file,
   });
   if (!res.ok) throw new Error(`Upload failed: ${res.status} ${await res.text()}`);
-  // Sestavit veřejnou URL
   return `${SB_URL}/storage/v1/object/public/receipts/${path}`;
 }
 
-
 // ============================================================
-// GOOGLE SHEETS & DRIVE (simulovanÃ© â nahradit Vercel Edge fn.)
+// GOOGLE SHEETS & DRIVE (simulované – nahradit Vercel Edge fn.)
 // Service account: pokladni-denik-export@pokladni-denik.iam.gserviceaccount.com
 // ============================================================
-const SHEET_HEADERS = ["Datum", "Äas", "Typ", "Typ platby", "Kategorie", "Dodavatel/OdbÄratel", "Popis", "Bez DPH", "S DPH", "Vklad/VÃ½bÄr", "Storno"];
+const SHEET_HEADERS = ["Datum", "Čas", "Typ", "Typ platby", "Kategorie", "Dodavatel/Odběratel", "Popis", "Bez DPH", "S DPH", "Vklad/Výběr", "Storno"];
 const DRIVE_ROOT_FOLDER_ID = "1ZO5cektWhTT6AZTQJ3GiIuJHOyJMluAv";
 
 // ============================================================
-// STORE â Supabase REST API
+// STORE – Supabase REST API
 // ============================================================
 function useStore() {
   const [firmy, setFirmy] = useState([]);
@@ -101,9 +98,9 @@ function useStore() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const localId = useRef(-1);
-  const lid = () => { localId.current -= 1; return localId.current; }; // temp negativnÃ­ ID pÅed fetch
+  const lid = () => { localId.current -= 1; return localId.current; }; // temp negativní ID před fetch
 
-  // ââ INITIAL LOAD ââââââââââââââââââââââââââââââââââââââââââ
+  // ── INITIAL LOAD ──────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     try {
       setLoading(true);
@@ -119,7 +116,7 @@ function useStore() {
       ]);
       setFirmy(fRes);
       setZam(zRes);
-      // Normalizuj assignments â {zamestnanec_id, firma_id}
+      // Normalizuj assignments → {zamestnanec_id, firma_id}
       setAsgn(aRes.map(r => ({ zamestnanec_id: r.zamestnanec_id, firma_id: r.firma_id })));
       setKat(kRes);
       setTx(tRes);
@@ -139,18 +136,18 @@ function useStore() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  // ââ GOOGLE SHEETS (simulovÃ¡no) ââââââââââââââââââââââââââââ
+  // ── GOOGLE SHEETS (simulováno) ────────────────────────────
   const exportToSheets = (txData, zamName, firmaId, firmaNazev, katName) => {
     const firma = firmy.find(f => f.id === firmaId);
     if (!firma || !firma.spreadsheet_id) return null;
     const row = [
       new Date(txData.created_at).toLocaleDateString("cs-CZ", { day: "2-digit", month: "2-digit", year: "2-digit" }),
       new Date(txData.created_at).toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" }),
-      txData.typ === "prijem" ? "PÅÃ­jem" : "VÃ½daj",
+      txData.typ === "prijem" ? "Příjem" : "Výdaj",
       txData.typ_platby === "hotovost" ? "Hotovost" : "Karta",
-      katName || "â", txData.dodavatel || "â", txData.popis || "â",
+      katName || "—", txData.dodavatel || "—", txData.popis || "—",
       txData.cena_bez_dph, txData.cena_s_dph,
-      txData.is_vklad ? (txData.typ === "prijem" ? "Vklad" : "VÃ½bÄr") : "",
+      txData.is_vklad ? (txData.typ === "prijem" ? "Vklad" : "Výběr") : "",
       txData.storno ? "ANO" : "",
     ];
     const logEntry = {
@@ -162,7 +159,7 @@ function useStore() {
     return logEntry;
   };
 
-  // ââ GOOGLE DRIVE (simulovÃ¡no) âââââââââââââââââââââââââââââ
+  // ── GOOGLE DRIVE (simulováno) ─────────────────────────────
   const uploadToDrive = (fileName, zamName, firmaNazev) => {
     if (!fileName || !DRIVE_ROOT_FOLDER_ID) return null;
     const logEntry = {
@@ -175,7 +172,7 @@ function useStore() {
     return logEntry;
   };
 
-  // ââ FIRMY âââââââââââââââââââââââââââââââââââââââââââââââââ
+  // ── FIRMY ─────────────────────────────────────────────────
   const addFirma = async (nazev, spreadsheet_id) => {
     const row = await sbPost("firmy", { nazev, spreadsheet_id: spreadsheet_id || null });
     setFirmy(p => [...p, row]);
@@ -193,7 +190,7 @@ function useStore() {
     setAsgn(p => p.filter(x => x.firma_id !== id));
   };
 
-  // ââ ZAMÄSTNANCI âââââââââââââââââââââââââââââââââââââââââââ
+  // ── ZAMĚSTNANCI ───────────────────────────────────────────
   const addZam = async (z) => {
     const row = await sbPost("zamestnanci", { jmeno: z.jmeno, pin: z.pin, role: z.role });
     setZam(p => [...p, row]);
@@ -221,7 +218,7 @@ function useStore() {
     }
   };
 
-  // ââ KATEGORIE âââââââââââââââââââââââââââââââââââââââââââââ
+  // ── KATEGORIE ─────────────────────────────────────────────
   const addKat = async (k) => {
     const row = await sbPost("kategorie", { nazev: k.nazev, typ: k.typ });
     setKat(p => [...p, row]);
@@ -232,7 +229,7 @@ function useStore() {
     setKat(p => p.filter(x => x.id !== id));
   };
 
-  // ââ TRANSAKCE âââââââââââââââââââââââââââââââââââââââââââââ
+  // ── TRANSAKCE ─────────────────────────────────────────────
   const addTx = async (t) => {
     const payload = {
       zamestnanec_id: t.zamestnanec_id,
@@ -253,7 +250,7 @@ function useStore() {
       approved: false,
     };
     const row = await sbPost("transakce", payload);
-    // ZapiÅ¡ historii
+    // Zapiš historii
     await sbPost("transakce_historie", {
       transakce_id: row.id, action: "vytvoreno",
       user_id: t.zamestnanec_id, pozn: null, before_data: null,
@@ -314,13 +311,13 @@ function useStore() {
     setTx(p => p.map(x => x.id === id ? { ...x, approved: true } : x));
   };
 
-  // ââ NOTIFIKACE ââââââââââââââââââââââââââââââââââââââââââââ
+  // ── NOTIFIKACE ────────────────────────────────────────────
   const markNotifsRead = async () => {
     await sbPatch("notifikace", "read=eq.false", { read: true }).catch(() => {});
     setNotifs(p => p.map(x => ({ ...x, read: true })));
   };
 
-  // ââ LIMITY ââââââââââââââââââââââââââââââââââââââââââââââââ
+  // ── LIMITY ────────────────────────────────────────────────
   const addLimit = async (l) => {
     const row = await sbPost("limity", {
       typ: l.typ, target_type: l.target_type,
@@ -334,7 +331,7 @@ function useStore() {
     setLimits(p => p.filter(x => x.id !== id));
   };
 
-  // ââ KONTROLA LIMITÅ® (pure, bez async) âââââââââââââââââââââ
+  // ── KONTROLA LIMITŮ (pure, bez async) ─────────────────────
   const checkLimits = (txData) => {
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -362,7 +359,7 @@ function useStore() {
     return warnings;
   };
 
-  // ââ DUPLICATE CHECK (pure) ââââââââââââââââââââââââââââââââ
+  // ── DUPLICATE CHECK (pure) ────────────────────────────────
   const isDuplicate = (userId, firmaId, amount) => {
     const cutoff = Date.now() - 120000;
     return tx.some(t =>
@@ -372,20 +369,16 @@ function useStore() {
     );
   };
 
-
-  // ── PŘÍLOHY → Supabase Storage ──────────────────────────────────────────────
+  // ── Nahrání přílohy do Supabase Storage ──────────────────────────────────
   const uploadReceipt = async (file, txId, zamId) => {
-    // Cesta: receipts/{zamId}/{txId}/{timestamp}_{filename}
     const ts = Date.now();
     const ext = file.name.split(".").pop();
     const path = `${zamId}/${txId}/${ts}.${ext}`;
     const url = await sbUploadFile(file, path);
-    // Aktualizuj priloha_url na transakci
     await sbPatch("transakce", `id=eq.${txId}`, { priloha_url: url });
     setTx(p => p.map(x => x.id === txId ? { ...x, priloha_url: url } : x));
     return url;
   };
-
 
   return {
     // data
@@ -445,7 +438,7 @@ const fmt = n => Number(n).toLocaleString("cs-CZ", { minimumFractionDigits: 2, m
 const fD = d => new Date(d).toLocaleDateString("cs-CZ", { day: "2-digit", month: "2-digit", year: "2-digit" });
 const fT = d => new Date(d).toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" });
 const fISO = d => { const o = new Date(d); return `${o.getFullYear()}-${String(o.getMonth()+1).padStart(2,"0")}-${String(o.getDate()).padStart(2,"0")}`; };
-const lu = (id, arr, k = "nazev") => arr.find(x => x.id === id)?.[k] || "â";
+const lu = (id, arr, k = "nazev") => arr.find(x => x.id === id)?.[k] || "—";
 
 const Fl = ({ l, children, s: st }) => <div style={{ marginBottom: 14, ...st }}><label style={sL}>{l}</label>{children}</div>;
 
@@ -467,7 +460,7 @@ function Confirm({ msg, onYes, onNo }) {
         <p style={{ fontSize: 15, fontWeight: 600, margin: "0 0 20px", lineHeight: 1.5 }}>{msg}</p>
         <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
           <button style={{ ...sB, background: P.green, color: "#fff", padding: "10px 28px" }} onClick={onYes}>Ano</button>
-          <button style={{ ...sB, background: "transparent", color: P.ink2, border: `1.5px solid ${P.border}`, padding: "10px 28px" }} onClick={onNo}>ZruÅ¡it</button>
+          <button style={{ ...sB, background: "transparent", color: P.ink2, border: `1.5px solid ${P.border}`, padding: "10px 28px" }} onClick={onNo}>Zrušit</button>
         </div>
       </div>
     </div>
@@ -483,7 +476,7 @@ function Prompt({ msg, onOk, onCancel, placeholder }) {
         <p style={{ fontSize: 15, fontWeight: 600, margin: "0 0 14px", lineHeight: 1.5 }}>{msg}</p>
         <input style={sI} placeholder={placeholder || ""} value={val} onChange={e => setVal(e.target.value)} autoFocus />
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
-          <button style={{ ...sB, background: "transparent", color: P.ink2, border: `1.5px solid ${P.border}` }} onClick={onCancel}>ZruÅ¡it</button>
+          <button style={{ ...sB, background: "transparent", color: P.ink2, border: `1.5px solid ${P.border}` }} onClick={onCancel}>Zrušit</button>
           <button style={{ ...sB, background: P.accent, color: "#fff" }} onClick={() => onOk(val)}>Potvrdit</button>
         </div>
       </div>
@@ -531,7 +524,7 @@ export default function App() {
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
       <style>{globalStyles}</style>
       <div style={{ width: 36, height: 36, border: `3px solid ${P.border}`, borderTopColor: P.accent, borderRadius: "50%", animation: "spin .8s linear infinite" }} />
-      <p style={{ margin: 0, fontSize: 14, color: P.ink2, fontWeight: 500 }}>NaÄÃ­tÃ¡nÃ­ datâ¦</p>
+      <p style={{ margin: 0, fontSize: 14, color: P.ink2, fontWeight: 500 }}>Načítání dat…</p>
     </div>
   );
 
@@ -540,8 +533,8 @@ export default function App() {
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
       <style>{globalStyles}</style>
       <div style={{ ...sC, maxWidth: 420, width: "100%", textAlign: "center" }}>
-        <div style={{ fontSize: 32, marginBottom: 12 }}>â ï¸</div>
-        <h2 style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 800 }}>Chyba pÅipojenÃ­ k databÃ¡zi</h2>
+        <div style={{ fontSize: 32, marginBottom: 12 }}>⚠️</div>
+        <h2 style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 800 }}>Chyba připojení k databázi</h2>
         <p style={{ margin: "0 0 16px", fontSize: 13, color: P.ink2, fontFamily: fm, wordBreak: "break-all" }}>{store.error}</p>
         <button style={{ ...sB, background: P.accent, color: "#fff", width: "100%", justifyContent: "center" }} onClick={store.refetch}>Zkusit znovu</button>
       </div>
@@ -565,7 +558,7 @@ export default function App() {
 }
 
 const isAdminRole = u => u.role === "superadmin" || u.role === "manazer";
-const roleLabel = { superadmin: "Superadmin", manazer: "ManaÅ¾er", zamestnanec: "ZamÄstnanec" };
+const roleLabel = { superadmin: "Superadmin", manazer: "Manažer", zamestnanec: "Zaměstnanec" };
 const roleColor = { superadmin: P.accent, manazer: P.blue, zamestnanec: P.ink3 };
 
 // ============================================================
@@ -579,7 +572,7 @@ function Login({ store, onLogin, nt }) {
 
   const selectUser = () => {
     const f = store.zamestnanci.find(z => z.jmeno.toLowerCase() === jmeno.trim().toLowerCase());
-    if (!f) return nt("ZamÄstnanec nenalezen", "error");
+    if (!f) return nt("Zaměstnanec nenalezen", "error");
     setFound(f);
     setStep("pin");
     setPin("");
@@ -587,7 +580,7 @@ function Login({ store, onLogin, nt }) {
 
   const checkPin = (p) => {
     if (p === found.pin) onLogin(found);
-    else { nt("NesprÃ¡vnÃ½ PIN", "error"); setPin(""); }
+    else { nt("Nesprávný PIN", "error"); setPin(""); }
   };
 
   const addDigit = d => {
@@ -604,7 +597,7 @@ function Login({ store, onLogin, nt }) {
             <Ic d={ic.cash} s={24} c="#fff" />
           </div>
           <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 800 }}>{found.jmeno}</h2>
-          <p style={{ margin: "0 0 20px", fontSize: 13, color: P.ink2 }}>Zadejte 4mÃ­stnÃ½ PIN</p>
+          <p style={{ margin: "0 0 20px", fontSize: 13, color: P.ink2 }}>Zadejte 4místný PIN</p>
 
           {/* PIN dots */}
           <div style={{ display: "flex", justifyContent: "center", gap: 12, marginBottom: 24 }}>
@@ -615,8 +608,8 @@ function Login({ store, onLogin, nt }) {
 
           {/* Numpad */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, maxWidth: 240, margin: "0 auto" }}>
-            {[1,2,3,4,5,6,7,8,9,null,0,"â«"].map((d, i) => (
-              <button key={i} onClick={() => { if (d === "â«") setPin(p => p.slice(0,-1)); else if (d !== null && pin.length < 4) addDigit(String(d)); }}
+            {[1,2,3,4,5,6,7,8,9,null,0,"⌫"].map((d, i) => (
+              <button key={i} onClick={() => { if (d === "⌫") setPin(p => p.slice(0,-1)); else if (d !== null && pin.length < 4) addDigit(String(d)); }}
                 style={{ ...sB, justifyContent: "center", fontSize: 20, fontWeight: 700, padding: "14px 0", borderRadius: 10, background: d === null ? "transparent" : "#f0f0ec", color: P.ink, border: "none", cursor: d === null ? "default" : "pointer", opacity: d === null ? 0 : 1 }}>
                 {d}
               </button>
@@ -624,7 +617,7 @@ function Login({ store, onLogin, nt }) {
           </div>
 
           <button style={{ ...sB, background: "transparent", color: P.ink2, marginTop: 16, padding: "6px 10px" }} onClick={() => { setStep("name"); setPin(""); }}>
-            <Ic d={ic.back} s={14} /> ZpÄt
+            <Ic d={ic.back} s={14} /> Zpět
           </button>
         </div>
       </div>
@@ -638,12 +631,12 @@ function Login({ store, onLogin, nt }) {
           <div style={{ width: 48, height: 48, background: P.accent, borderRadius: 10, display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
             <Ic d={ic.cash} s={24} c="#fff" />
           </div>
-          <h1 style={{ margin: "0 0 2px", fontSize: 20, fontWeight: 800, letterSpacing: "-.02em" }}>POKLADNÃ DENÃK</h1>
+          <h1 style={{ margin: "0 0 2px", fontSize: 20, fontWeight: 800, letterSpacing: "-.02em" }}>POKLADNÍ DENÍK</h1>
           <p style={{ margin: "0 0 2px", fontSize: 14, fontWeight: 600, color: P.accent }}>Helenka 1.0</p>
-          <p style={{ margin: 0, fontSize: 13, color: P.ink2 }}>PÅihlÃ¡Å¡enÃ­ zamÄstnance</p>
+          <p style={{ margin: 0, fontSize: 13, color: P.ink2 }}>Přihlášení zaměstnance</p>
         </div>
-        <Fl l="JmÃ©no"><input style={sI} placeholder="VaÅ¡e jmÃ©no" value={jmeno} onChange={e => setJmeno(e.target.value)} onKeyDown={e => e.key === "Enter" && selectUser()} /></Fl>
-        <button style={{ ...sB, background: P.accent, color: "#fff", width: "100%", justifyContent: "center", padding: "11px 20px", fontSize: 14, marginTop: 4 }} onClick={selectUser}>PokraÄovat</button>
+        <Fl l="Jméno"><input style={sI} placeholder="Vaše jméno" value={jmeno} onChange={e => setJmeno(e.target.value)} onKeyDown={e => e.key === "Enter" && selectUser()} /></Fl>
+        <button style={{ ...sB, background: P.accent, color: "#fff", width: "100%", justifyContent: "center", padding: "11px 20px", fontSize: 14, marginTop: 4 }} onClick={selectUser}>Pokračovat</button>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 16 }}>
           <span style={{ fontSize: 11, color: P.ink3 }}>by <strong>OCELKUJ</strong></span>
           <img src="data:image/png;base64,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" alt="" style={{ width: 32, height: 32, borderRadius: "50%" }} />
@@ -672,7 +665,7 @@ function EmpPanel({ user, store, scr, setScr, nt, onLogout }) {
 
   return (
     <div style={{ maxWidth: 460, margin: "0 auto", padding: "16px 16px 40px" }}>
-      <Header title="PokladnÃ­ DenÃ­k" sub={user.jmeno} right={<>
+      <Header title="Pokladní Deník" sub={user.jmeno} right={<>
         {isA && <button style={{ ...sB, background: "transparent", color: P.accent, border: `1.5px solid ${P.accent}` }} onClick={() => setScr("admin")}>Admin</button>}
         <button style={{ ...sB, background: "transparent", color: P.ink2, padding: "6px 10px" }} onClick={onLogout}><Ic d={ic.logout} s={16} /></button>
       </>} />
@@ -690,8 +683,8 @@ function EmpPanel({ user, store, scr, setScr, nt, onLogout }) {
       )}
 
       <div style={{ ...sC, marginBottom: 16, padding: "20px 24px", border: "none", background: `linear-gradient(135deg,${P.accent} 0%,#b8501f 100%)`, color: "#fff" }}>
-        <div style={{ fontSize: 12, opacity: .8, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".04em" }}>HotovostnÃ­ pokladna{fName ? ` Â· ${fName}` : ""}</div>
-        <div style={{ fontSize: 34, fontWeight: 800, fontFamily: fm, marginTop: 4, letterSpacing: "-.02em" }}>{fmt(cashBal)} <span style={{ fontSize: 18, fontWeight: 500 }}>KÄ</span></div>
+        <div style={{ fontSize: 12, opacity: .8, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".04em" }}>Hotovostní pokladna{fName ? ` · ${fName}` : ""}</div>
+        <div style={{ fontSize: 34, fontWeight: 800, fontFamily: fm, marginTop: 4, letterSpacing: "-.02em" }}>{fmt(cashBal)} <span style={{ fontSize: 18, fontWeight: 500 }}>Kč</span></div>
       </div>
 
       {/* Action buttons */}
@@ -705,25 +698,25 @@ function EmpPanel({ user, store, scr, setScr, nt, onLogout }) {
           <Ic d={ic.wallet} s={15} c={P.green} /> Vklad
         </button>
         <button style={{ ...sB, flex: 1, justifyContent: "center", padding: "10px", fontSize: 13, borderRadius: 8, background: P.redBg, color: P.red, border: `1px solid #f5c6be` }} onClick={() => setScr("vyber")}>
-          <Ic d={ic.wallet} s={15} c={P.red} /> VÃ½bÄr
+          <Ic d={ic.wallet} s={15} c={P.red} /> Výběr
         </button>
       </div>
 
-      <div style={{ fontSize: 13, fontWeight: 700, color: P.ink2, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".04em" }}>PoslednÃ­ transakce</div>
-      {myTx.length === 0 ? <p style={{ color: P.ink3, fontSize: 14, textAlign: "center", padding: 24 }}>ZatÃ­m Å¾Ã¡dnÃ© transakce</p> : (
+      <div style={{ fontSize: 13, fontWeight: 700, color: P.ink2, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".04em" }}>Poslední transakce</div>
+      {myTx.length === 0 ? <p style={{ color: P.ink3, fontSize: 14, textAlign: "center", padding: 24 }}>Zatím žádné transakce</p> : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {myTx.slice(0, 25).map(t => (
             <div key={t.id} style={{ ...sC, padding: "11px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", opacity: t.storno ? .5 : 1 }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center", gap: 6 }}>
-                  {t.is_vklad && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 99, background: t.typ === "prijem" ? P.greenBg : P.redBg, color: t.typ === "prijem" ? P.green : P.red }}>{t.typ === "prijem" ? "VKLAD" : "VÃBÄR"}</span>}
+                  {t.is_vklad && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 99, background: t.typ === "prijem" ? P.greenBg : P.redBg, color: t.typ === "prijem" ? P.green : P.red }}>{t.typ === "prijem" ? "VKLAD" : "VÝBĚR"}</span>}
                   {t.edited && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 99, background: P.orangeBg, color: P.orange }}>UPRAVENO</span>}
                   {t.popis || "Bez popisu"}
                 </div>
-                <div style={{ fontSize: 12, color: P.ink3, marginTop: 2 }}>{t.typ_platby === "hotovost" ? "ðµ" : "ð³"} Â· {fD(t.created_at)} {fT(t.created_at)}</div>
+                <div style={{ fontSize: 12, color: P.ink3, marginTop: 2 }}>{t.typ_platby === "hotovost" ? "💵" : "💳"} · {fD(t.created_at)} {fT(t.created_at)}</div>
               </div>
               <div style={{ fontSize: 14, fontWeight: 700, fontFamily: fm, whiteSpace: "nowrap", marginLeft: 12, color: t.typ === "prijem" ? P.green : P.red }}>
-                {t.typ === "prijem" ? "+" : "â"}{fmt(t.cena_s_dph)}
+                {t.typ === "prijem" ? "+" : "−"}{fmt(t.cena_s_dph)}
               </div>
             </div>
           ))}
@@ -734,7 +727,7 @@ function EmpPanel({ user, store, scr, setScr, nt, onLogout }) {
 }
 
 // ============================================================
-// VKLAD / VÃBÄR FORM
+// VKLAD / VÝBĚR FORM
 // ============================================================
 function VkladForm({ user, store, firmy, defF, onBack, nt, typ }) {
   const [firma, setFirma] = useState(defF || firmy[0]?.id || "");
@@ -747,8 +740,8 @@ function VkladForm({ user, store, firmy, defF, onBack, nt, typ }) {
   const isVklad = typ === "prijem";
 
   const save = () => {
-    if (!castka || Number(castka) <= 0) return nt("Zadejte ÄÃ¡stku", "error");
-    if (!pozn.trim()) return nt("VyplÅte poznÃ¡mku (odkud/kam penÃ­ze)", "error");
+    if (!castka || Number(castka) <= 0) return nt("Zadejte částku", "error");
+    if (!pozn.trim()) return nt("Vyplňte poznámku (odkud/kam peníze)", "error");
     setConfirm(true);
   };
 
@@ -757,47 +750,44 @@ function VkladForm({ user, store, firmy, defF, onBack, nt, typ }) {
     try {
       const saved = await store.addTx(txData);
       if (fileObj && saved?.id) {
-        try {
-          await store.uploadReceipt(fileObj, saved.id, user.id);
-        } catch (uploadErr) {
-          nt("Vklad uložen, příloha se nepodařila: " + uploadErr.message, "error");
-        }
+        try { await store.uploadReceipt(fileObj, saved.id, user.id); }
+        catch (e) { nt("Příloha se nepodařila: " + e.message, "error"); }
       }
       const firmaNazev = store.firmy.find(x => x.id === Number(firma))?.nazev || "";
       store.exportToSheets(saved || txData, user.jmeno, Number(firma), firmaNazev, null);
       if (fileName) store.uploadToDrive(fileName, user.jmeno, firmaNazev);
       setShowSuccess(true);
     } catch (e) {
-      nt("Chyba pÅi uklÃ¡dÃ¡nÃ­: " + e.message, "error");
+      nt("Chyba při ukládání: " + e.message, "error");
     }
   };
 
   return (
     <div style={{ maxWidth: 460, margin: "0 auto", padding: "16px 16px 40px", animation: "fIn .2s ease-out" }}>
       {showSuccess && <SuccessScreen onDone={onBack} />}
-      {confirm && <Confirm msg={`${isVklad ? "Vklad" : "VÃ½bÄr"} ${fmt(castka)} KÄ â potvrdit?`} onYes={doSave} onNo={() => setConfirm(false)} />}
-      <button style={{ ...sB, background: "transparent", color: P.ink2, padding: "6px 10px", marginBottom: 12 }} onClick={onBack}><Ic d={ic.back} s={16} /> ZpÄt</button>
-      <h2 style={{ margin: "0 0 20px", fontSize: 20, fontWeight: 800 }}>{isVklad ? "ð° Vklad do pokladny" : "ð¸ VÃ½bÄr z pokladny"}</h2>
+      {confirm && <Confirm msg={`${isVklad ? "Vklad" : "Výběr"} ${fmt(castka)} Kč – potvrdit?`} onYes={doSave} onNo={() => setConfirm(false)} />}
+      <button style={{ ...sB, background: "transparent", color: P.ink2, padding: "6px 10px", marginBottom: 12 }} onClick={onBack}><Ic d={ic.back} s={16} /> Zpět</button>
+      <h2 style={{ margin: "0 0 20px", fontSize: 20, fontWeight: 800 }}>{isVklad ? "💰 Vklad do pokladny" : "💸 Výběr z pokladny"}</h2>
       <div style={sC}>
         <Fl l="Firma">
           <select style={sI} value={firma} onChange={e => setFirma(e.target.value)}>
             {firmy.map(x => <option key={x.id} value={x.id}>{x.nazev}</option>)}
           </select>
         </Fl>
-        <Fl l="ÄÃ¡stka (KÄ)">
+        <Fl l="Částka (Kč)">
           <input style={{ ...sI, fontSize: 22, fontWeight: 700, fontFamily: fm, textAlign: "center" }} type="number" step="0.01" placeholder="0,00" value={castka} onChange={e => setCastka(e.target.value)} />
         </Fl>
-        <Fl l="PoznÃ¡mka (povinnÃ¡)">
-          <input style={sI} placeholder={isVklad ? "Odkud penÃ­ze pÅiÅ¡ly â napÅ. vÃ½bÄr z banky" : "Kam penÃ­ze odeÅ¡ly â napÅ. odvoz do trezoru"} value={pozn} onChange={e => setPozn(e.target.value)} />
+        <Fl l="Poznámka (povinná)">
+          <input style={sI} placeholder={isVklad ? "Odkud peníze přišly – např. výběr z banky" : "Kam peníze odešly – např. odvoz do trezoru"} value={pozn} onChange={e => setPozn(e.target.value)} />
         </Fl>
-        <Fl l="Doklad (pÅÃ­loha)">
+        <Fl l="Doklad (příloha)">
           <input ref={fileRef} type="file" accept="image/*,application/pdf" capture="environment" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) setFileName(e.target.files[0].name); }} />
           <button style={{ ...sB, background: "transparent", color: P.accent, border: `1.5px solid ${P.accent}`, width: "100%", justifyContent: "center" }} onClick={() => fileRef.current.click()}>
-            <Ic d={ic.upload} s={15} /> {fileName || "Vyfotit / nahrÃ¡t doklad"}
+            <Ic d={ic.upload} s={15} /> {fileName || "Vyfotit / nahrát doklad"}
           </button>
         </Fl>
         <button style={{ ...sB, background: isVklad ? P.green : P.red, color: "#fff", width: "100%", justifyContent: "center", padding: 12, fontSize: 15, marginTop: 6 }} onClick={save}>
-          {isVklad ? "Zaznamenat vklad" : "Zaznamenat vÃ½bÄr"}
+          {isVklad ? "Zaznamenat vklad" : "Zaznamenat výběr"}
         </button>
       </div>
     </div>
@@ -828,10 +818,10 @@ function SuccessScreen({ onDone }) {
         </div>
         <div style={{ animation: "slideUp .5s ease-out .4s both" }}>
           <div style={{ fontSize: 32, fontWeight: 800, color: "#fff", marginTop: 24, fontFamily: ff, letterSpacing: "-.02em", textShadow: "0 2px 12px rgba(0,0,0,.4)" }}>
-            TRANSAKCE PÅIJATA â
+            TRANSAKCE PŘIJATA ✓
           </div>
           <div style={{ fontSize: 15, color: "rgba(255,255,255,.65)", marginTop: 8, fontFamily: ff }}>
-            ZÃ¡znam byl ÃºspÄÅ¡nÄ uloÅ¾en
+            Záznam byl úspěšně uložen
           </div>
         </div>
       </div>
@@ -853,8 +843,8 @@ function TxForm({ user, store, firmy, defF, onBack, nt }) {
   const suggRef = useRef();
   const up = (k, v) => setF(p => ({ ...p, [k]: v }));
   const filtKat = store.kategorie.filter(k => k.typ === "oba" || k.typ === f.typ);
-  const dodLabel = f.typ === "prijem" ? "OdbÄratel" : "Dodavatel";
-  const dodPh = f.typ === "prijem" ? "NÃ¡zev odbÄratele" : "NÃ¡zev dodavatele";
+  const dodLabel = f.typ === "prijem" ? "Odběratel" : "Dodavatel";
+  const dodPh = f.typ === "prijem" ? "Název odběratele" : "Název dodavatele";
   const allNames = useMemo(() => [...new Set(store.transakce.map(t => t.dodavatel).filter(Boolean))].sort(), [store.transakce]);
   const sugg = f.dodavatel.trim() ? allNames.filter(n => n.toLowerCase().includes(f.dodavatel.toLowerCase().trim())) : allNames;
 
@@ -867,7 +857,7 @@ function TxForm({ user, store, firmy, defF, onBack, nt }) {
 
   const trySave = () => {
     if (!f.firma_id) return nt("Vyberte firmu", "error");
-    if (!f.sdph) return nt("VyplÅte cenu s DPH", "error");
+    if (!f.sdph) return nt("Vyplňte cenu s DPH", "error");
     if (store.isDuplicate(user.id, Number(f.firma_id), Number(f.sdph))) { setDupWarn(true); return; }
     // Check spending limits
     if (f.typ === "vydaj") {
@@ -881,13 +871,9 @@ function TxForm({ user, store, firmy, defF, onBack, nt }) {
     const txData = { zamestnanec_id: user.id, firma_id: Number(f.firma_id), typ: f.typ, kategorie_id: f.kategorie_id ? Number(f.kategorie_id) : null, dodavatel: f.dodavatel || null, popis: f.popis || null, cena_bez_dph: Number(f.bez) || 0, cena_s_dph: Number(f.sdph), typ_platby: f.platba, priloha_url: fileName || null, is_vklad: false };
     try {
       const saved = await store.addTx(txData);
-      // Nahrát přílohu do Supabase Storage
       if (fileObj && saved?.id) {
-        try {
-          await store.uploadReceipt(fileObj, saved.id, user.id);
-        } catch (uploadErr) {
-          nt("Transakce uložena, příloha se nepodařila: " + uploadErr.message, "error");
-        }
+        try { await store.uploadReceipt(fileObj, saved.id, user.id); }
+        catch (e) { nt("Příloha se nepodařila: " + e.message, "error"); }
       }
       const katName = f.kategorie_id ? store.kategorie.find(k => k.id === Number(f.kategorie_id))?.nazev : null;
       const firmaNazev = store.firmy.find(x => x.id === Number(f.firma_id))?.nazev || "";
@@ -895,7 +881,7 @@ function TxForm({ user, store, firmy, defF, onBack, nt }) {
       if (fileName) store.uploadToDrive(fileName, user.jmeno, firmaNazev);
       setShowSuccess(true);
     } catch (e) {
-      nt("Chyba pÅi uklÃ¡dÃ¡nÃ­: " + e.message, "error");
+      nt("Chyba při ukládání: " + e.message, "error");
     }
   };
 
@@ -908,28 +894,28 @@ function TxForm({ user, store, firmy, defF, onBack, nt }) {
   return (
     <div style={{ maxWidth: 460, margin: "0 auto", padding: "16px 16px 40px", animation: "fIn .2s ease-out" }}>
       {showSuccess && <SuccessScreen onDone={onBack} />}
-      {confirm && <Confirm msg={`UloÅ¾it ${f.typ === "prijem" ? "pÅÃ­jem" : "vÃ½daj"} ${fmt(f.sdph)} KÄ?`} onYes={doSave} onNo={() => setConfirm(false)} />}
-      {dupWarn && <Confirm msg="â ï¸ Velmi podobnÃ¡ transakce byla zadÃ¡na pÅed chvÃ­lÃ­. Opravdu chcete pokraÄovat?" onYes={() => { setDupWarn(false); setConfirm(true); }} onNo={() => setDupWarn(false)} />}
-      {limitWarn && <Confirm msg={`â ï¸ PÅekroÄenÃ­ limitu!\n${limitWarn.map(w => `${w.targetName}: ${fmt(w.newTotal)} / ${fmt(w.limit.limit_czk)} KÄ (${w.limit.typ === "denny" ? "dennÃ­" : "mÄsÃ­ÄnÃ­"})`).join("\n")}\n\nPokraÄovat pÅesto?`} onYes={() => { setLimitWarn(null); setConfirm(true); }} onNo={() => setLimitWarn(null)} />}
+      {confirm && <Confirm msg={`Uložit ${f.typ === "prijem" ? "příjem" : "výdaj"} ${fmt(f.sdph)} Kč?`} onYes={doSave} onNo={() => setConfirm(false)} />}
+      {dupWarn && <Confirm msg="⚠️ Velmi podobná transakce byla zadána před chvílí. Opravdu chcete pokračovat?" onYes={() => { setDupWarn(false); setConfirm(true); }} onNo={() => setDupWarn(false)} />}
+      {limitWarn && <Confirm msg={`⚠️ Překročení limitu!\n${limitWarn.map(w => `${w.targetName}: ${fmt(w.newTotal)} / ${fmt(w.limit.limit_czk)} Kč (${w.limit.typ === "denny" ? "denní" : "měsíční"})`).join("\n")}\n\nPokračovat přesto?`} onYes={() => { setLimitWarn(null); setConfirm(true); }} onNo={() => setLimitWarn(null)} />}
 
-      <button style={{ ...sB, background: "transparent", color: P.ink2, padding: "6px 10px", marginBottom: 12 }} onClick={onBack}><Ic d={ic.back} s={16} /> ZpÄt</button>
-      <h2 style={{ margin: "0 0 20px", fontSize: 20, fontWeight: 800 }}>NovÃ¡ transakce</h2>
+      <button style={{ ...sB, background: "transparent", color: P.ink2, padding: "6px 10px", marginBottom: 12 }} onClick={onBack}><Ic d={ic.back} s={16} /> Zpět</button>
+      <h2 style={{ margin: "0 0 20px", fontSize: 20, fontWeight: 800 }}>Nová transakce</h2>
       <div style={sC}>
         <Fl l="Firma">
           <select style={sI} value={f.firma_id} onChange={e => up("firma_id", e.target.value)}>
-            {firmy.length === 0 && <option value="">â NemÃ¡te pÅiÅazenu firmu â</option>}
+            {firmy.length === 0 && <option value="">— Nemáte přiřazenu firmu —</option>}
             {firmy.map(x => <option key={x.id} value={x.id}>{x.nazev}</option>)}
           </select>
         </Fl>
         <Fl l="Typ">
           <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={() => up("typ", "prijem")} style={tog("typ", "prijem", P.green)}>PÅÃ­jem</button>
-            <button onClick={() => up("typ", "vydaj")} style={tog("typ", "vydaj", P.red)}>VÃ½daj</button>
+            <button onClick={() => up("typ", "prijem")} style={tog("typ", "prijem", P.green)}>Příjem</button>
+            <button onClick={() => up("typ", "vydaj")} style={tog("typ", "vydaj", P.red)}>Výdaj</button>
           </div>
         </Fl>
         <Fl l="Kategorie">
           <select style={sI} value={f.kategorie_id} onChange={e => up("kategorie_id", e.target.value)}>
-            <option value="">â Vyberte â</option>
+            <option value="">— Vyberte —</option>
             {filtKat.map(k => <option key={k.id} value={k.id}>{k.nazev}</option>)}
           </select>
         </Fl>
@@ -947,24 +933,24 @@ function TxForm({ user, store, firmy, defF, onBack, nt }) {
             )}
           </div>
         </Fl>
-        <Fl l="Popis"><input style={sI} placeholder="napÅ. nÃ¡kup Å¾Ã¡rovek do auta" value={f.popis} onChange={e => up("popis", e.target.value)} /></Fl>
+        <Fl l="Popis"><input style={sI} placeholder="např. nákup žárovek do auta" value={f.popis} onChange={e => up("popis", e.target.value)} /></Fl>
         <div style={{ display: "flex", gap: 10 }}>
           <Fl l="Bez DPH" s={{ flex: 1 }}><input style={sI} type="number" step="0.01" placeholder="0,00" value={f.bez} onChange={e => up("bez", e.target.value)} /></Fl>
           <Fl l="S DPH" s={{ flex: 1 }}><input style={sI} type="number" step="0.01" placeholder="0,00" value={f.sdph} onChange={e => up("sdph", e.target.value)} /></Fl>
         </div>
         <Fl l="Platba">
           <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={() => up("platba", "hotovost")} style={tog("platba", "hotovost", P.blue)}>ðµ Hotovost</button>
-            <button onClick={() => up("platba", "karta")} style={tog("platba", "karta", P.blue)}>ð³ Karta</button>
+            <button onClick={() => up("platba", "hotovost")} style={tog("platba", "hotovost", P.blue)}>💵 Hotovost</button>
+            <button onClick={() => up("platba", "karta")} style={tog("platba", "karta", P.blue)}>💳 Karta</button>
           </div>
         </Fl>
         <Fl l="Doklad">
           <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) setFileName(e.target.files[0].name); }} />
           <button style={{ ...sB, background: "transparent", color: P.accent, border: `1.5px solid ${P.accent}`, width: "100%", justifyContent: "center" }} onClick={() => fileRef.current.click()}>
-            <Ic d={ic.upload} s={15} /> {fileName || "Vyfotit / nahrÃ¡t doklad"}
+            <Ic d={ic.upload} s={15} /> {fileName || "Vyfotit / nahrát doklad"}
           </button>
         </Fl>
-        <button style={{ ...sB, background: P.green, color: "#fff", width: "100%", justifyContent: "center", padding: 12, fontSize: 15, marginTop: 6 }} onClick={trySave}>UloÅ¾it transakci</button>
+        <button style={{ ...sB, background: P.green, color: "#fff", width: "100%", justifyContent: "center", padding: 12, fontSize: 15, marginTop: 6 }} onClick={trySave}>Uložit transakci</button>
       </div>
     </div>
   );
@@ -981,10 +967,10 @@ function AdminPanel({ user, store, scr, setScr, nt, onLogout }) {
   const visibleFirmyIds = isSA ? store.firmy.map(f => f.id) : store.assignments.filter(a => a.zamestnanec_id === user.id).map(a => a.firma_id);
 
   const tabs = [
-    { id: "admin", l: "PÅehledy", i: ic.list },
+    { id: "admin", l: "Přehledy", i: ic.list },
     { id: "admin-dash", l: "Dashboard", i: ic.cash },
     ...(isSA ? [{ id: "admin-limits", l: "Limity", i: ic.ban }] : []),
-    ...(isSA ? [{ id: "admin-emp", l: "ZamÄstnanci", i: ic.users }] : []),
+    ...(isSA ? [{ id: "admin-emp", l: "Zaměstnanci", i: ic.users }] : []),
     ...(isSA ? [{ id: "admin-comp", l: "Firmy", i: ic.building }] : []),
     ...(isSA ? [{ id: "admin-cat", l: "Kategorie", i: ic.tag }] : []),
     { id: "admin-sheets", l: "Google", i: ic.sheet },
@@ -993,7 +979,7 @@ function AdminPanel({ user, store, scr, setScr, nt, onLogout }) {
 
   return (
     <div style={{ maxWidth: 860, margin: "0 auto", padding: "16px 16px 40px" }}>
-      <Header title="PokladnÃ­ DenÃ­k" sub={`${roleLabel[user.role]} Â· ${user.jmeno}`} right={<>
+      <Header title="Pokladní Deník" sub={`${roleLabel[user.role]} · ${user.jmeno}`} right={<>
         <button style={{ ...sB, background: "transparent", color: P.accent, border: `1.5px solid ${P.accent}` }} onClick={() => setScr("home")}><Ic d={ic.cash} s={15} /> Pokladna</button>
         <button style={{ ...sB, background: "transparent", color: P.ink2, padding: "6px 10px" }} onClick={onLogout}><Ic d={ic.logout} s={16} /></button>
       </>} />
@@ -1055,15 +1041,15 @@ function OverviewTab({ store, nt, user, visibleFirmyIds }) {
   allTx.filter(t => t.typ_platby === "hotovost" && !t.storno).forEach(t => {
     const n = lu(t.zamestnanec_id, store.zamestnanci, "jmeno");
     const fN = lu(t.firma_id, store.firmy);
-    const key = `${n} Â· ${fN}`;
+    const key = `${n} · ${fN}`;
     bals[key] = (bals[key] || 0) + (t.typ === "prijem" ? 1 : -1) * Number(t.cena_s_dph);
   });
 
   const exportCSV = () => {
-    const hdr = "Datum;ZamÄstnanec;Firma;Typ;Kategorie;Dodavatel;Popis;Bez DPH;S DPH;Platba;Storno";
+    const hdr = "Datum;Zaměstnanec;Firma;Typ;Kategorie;Dodavatel;Popis;Bez DPH;S DPH;Platba;Storno";
     const rows = txs.map(t => [
       `${fD(t.created_at)} ${fT(t.created_at)}`, lu(t.zamestnanec_id, store.zamestnanci, "jmeno"), lu(t.firma_id, store.firmy),
-      t.typ === "prijem" ? "PÅÃ­jem" : "VÃ½daj", lu(t.kategorie_id, store.kategorie), t.dodavatel || "",
+      t.typ === "prijem" ? "Příjem" : "Výdaj", lu(t.kategorie_id, store.kategorie), t.dodavatel || "",
       t.popis || "", t.cena_bez_dph, t.cena_s_dph, t.typ_platby === "hotovost" ? "Hotovost" : "Karta", t.storno ? "ANO" : "",
     ].join(";"));
     const csv = "\uFEFF" + [hdr, ...rows].join("\n");
@@ -1071,13 +1057,13 @@ function OverviewTab({ store, nt, user, visibleFirmyIds }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = `pokladni-denik-${fISO(new Date())}.csv`; a.click();
     URL.revokeObjectURL(url);
-    nt("CSV exportovÃ¡no â");
+    nt("CSV exportováno ✓");
   };
 
   return (
     <div>
       {/* Storno/Edit dialogs */}
-      {stornoId && <Prompt msg="DÅ¯vod storna:" placeholder="ProÄ transakci stornujete?" onOk={async val => { try { await store.stornoTx(stornoId, val, user.id); nt("Transakce stornovÃ¡na"); } catch(e) { nt("Chyba: "+e.message,"error"); } setStornoId(null); }} onCancel={() => setStornoId(null)} />}
+      {stornoId && <Prompt msg="Důvod storna:" placeholder="Proč transakci stornujete?" onOk={async val => { try { await store.stornoTx(stornoId, val, user.id); nt("Transakce stornována"); } catch(e) { nt("Chyba: "+e.message,"error"); } setStornoId(null); }} onCancel={() => setStornoId(null)} />}
       {editId && <EditDialog store={store} txId={editId} userId={user.id} onClose={() => setEditId(null)} nt={nt} />}
 
       {/* Balance cards */}
@@ -1086,7 +1072,7 @@ function OverviewTab({ store, nt, user, visibleFirmyIds }) {
           {Object.entries(bals).map(([n, b]) => (
             <div key={n} style={{ ...sC, padding: "12px 18px", flex: "1 1 200px", background: b >= 0 ? P.greenBg : P.redBg, borderColor: b >= 0 ? "#b7dfc7" : "#f5c6be" }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: P.ink2 }}>{n}</div>
-              <div style={{ fontSize: 20, fontWeight: 800, fontFamily: fm, color: b >= 0 ? P.green : P.red }}>{fmt(b)} KÄ</div>
+              <div style={{ fontSize: 20, fontWeight: 800, fontFamily: fm, color: b >= 0 ? P.green : P.red }}>{fmt(b)} Kč</div>
             </div>
           ))}
         </div>
@@ -1095,12 +1081,12 @@ function OverviewTab({ store, nt, user, visibleFirmyIds }) {
       {/* Summary */}
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
         <div style={{ ...sC, padding: "10px 16px", flex: "1 1 120px" }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: P.ink3, textTransform: "uppercase" }}>PÅÃ­jmy</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: P.ink3, textTransform: "uppercase" }}>Příjmy</div>
           <div style={{ fontSize: 18, fontWeight: 800, color: P.green, fontFamily: fm }}>+{fmt(totalIn)}</div>
         </div>
         <div style={{ ...sC, padding: "10px 16px", flex: "1 1 120px" }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: P.ink3, textTransform: "uppercase" }}>VÃ½daje</div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: P.red, fontFamily: fm }}>â{fmt(totalOut)}</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: P.ink3, textTransform: "uppercase" }}>Výdaje</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: P.red, fontFamily: fm }}>−{fmt(totalOut)}</div>
         </div>
         <div style={{ ...sC, padding: "10px 16px", flex: "1 1 120px" }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: P.ink3, textTransform: "uppercase" }}>Saldo</div>
@@ -1111,23 +1097,23 @@ function OverviewTab({ store, nt, user, visibleFirmyIds }) {
       {/* Filters */}
       <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
         <select style={{ ...sI, width: "auto", flex: 1 }} value={fZ} onChange={e => setFZ(e.target.value)}>
-          <option value="">VÅ¡ichni zamÄstnanci</option>
+          <option value="">Všichni zaměstnanci</option>
           {store.zamestnanci.map(z => <option key={z.id} value={z.id}>{z.jmeno}</option>)}
         </select>
         <select style={{ ...sI, width: "auto", flex: 1 }} value={fF} onChange={e => setFF(e.target.value)}>
-          <option value="">VÅ¡echny firmy</option>
+          <option value="">Všechny firmy</option>
           {store.firmy.filter(f => visibleFirmyIds.includes(f.id)).map(f => <option key={f.id} value={f.id}>{f.nazev}</option>)}
         </select>
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
         <input style={{ ...sI, width: "auto", flex: 1 }} type="date" value={dFrom} onChange={e => setDFrom(e.target.value)} />
-        <span style={{ color: P.ink3, fontSize: 13 }}>â</span>
+        <span style={{ color: P.ink3, fontSize: 13 }}>→</span>
         <input style={{ ...sI, width: "auto", flex: 1 }} type="date" value={dTo} onChange={e => setDTo(e.target.value)} />
         <select style={{ ...sI, width: "auto", flex: "0 0 auto" }} value={fStatus} onChange={e => setFStatus(e.target.value)}>
-          <option value="">VÅ¡e</option>
-          <option value="active">Jen aktivnÃ­</option>
-          <option value="storno">Jen stornovanÃ©</option>
-          <option value="edited">Jen upravenÃ©</option>
+          <option value="">Vše</option>
+          <option value="active">Jen aktivní</option>
+          <option value="storno">Jen stornované</option>
+          <option value="edited">Jen upravené</option>
         </select>
         <button style={{ ...sB, background: P.accent, color: "#fff" }} onClick={exportCSV}><Ic d={ic.download} s={14} c="#fff" /> CSV</button>
       </div>
@@ -1137,7 +1123,7 @@ function OverviewTab({ store, nt, user, visibleFirmyIds }) {
         <table style={{ width: "100%", fontSize: 13, fontFamily: ff }}>
           <thead>
             <tr style={{ background: "#fafaf8" }}>
-              {["Datum", "ZamÄstnanec", "Firma", "Typ", "Popis", "ÄÃ¡stka", "Pl.", "Doklad", "Stav", ""].map(h => (
+              {["Datum", "Zaměstnanec", "Firma", "Typ", "Popis", "Částka", "Pl.", "Doklad", "Stav", ""].map(h => (
                 <th key={h} style={{ padding: "10px 8px", textAlign: "left", fontWeight: 700, color: P.ink2, borderBottom: `2px solid ${P.border}`, whiteSpace: "nowrap", fontSize: 11, textTransform: "uppercase", letterSpacing: ".03em" }}>{h}</th>
               ))}
             </tr>
@@ -1151,26 +1137,26 @@ function OverviewTab({ store, nt, user, visibleFirmyIds }) {
                 <td style={{ padding: "8px 8px" }}>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
                     <span style={{ padding: "2px 6px", borderRadius: 99, fontSize: 10, fontWeight: 700, background: t.typ === "prijem" ? P.greenBg : P.redBg, color: t.typ === "prijem" ? P.green : P.red }}>
-                      {t.is_vklad ? (t.typ === "prijem" ? "VKLAD" : "VÃBÄR") : t.typ === "prijem" ? "PÅÃ­jem" : "VÃ½daj"}
+                      {t.is_vklad ? (t.typ === "prijem" ? "VKLAD" : "VÝBĚR") : t.typ === "prijem" ? "Příjem" : "Výdaj"}
                     </span>
-                    {t.edited && <span style={{ padding: "2px 4px", borderRadius: 99, fontSize: 9, fontWeight: 700, background: P.orangeBg, color: P.orange }}>â</span>}
-                    {t.storno && <span style={{ padding: "2px 4px", borderRadius: 99, fontSize: 9, fontWeight: 700, background: P.redBg, color: P.red }}>â</span>}
+                    {t.edited && <span style={{ padding: "2px 4px", borderRadius: 99, fontSize: 9, fontWeight: 700, background: P.orangeBg, color: P.orange }}>✎</span>}
+                    {t.storno && <span style={{ padding: "2px 4px", borderRadius: 99, fontSize: 9, fontWeight: 700, background: P.redBg, color: P.red }}>✗</span>}
                   </span>
                 </td>
-                <td style={{ padding: "8px 8px", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.popis || "â"}</td>
-                <td style={{ padding: "8px 8px", fontWeight: 700, fontFamily: fm, color: t.typ === "prijem" ? P.green : P.red, whiteSpace: "nowrap" }}>{t.typ === "prijem" ? "+" : "â"}{fmt(t.cena_s_dph)}</td>
-                <td style={{ padding: "8px 8px", textAlign: "center" }}>{t.typ_platby === "hotovost" ? "ðµ" : "ð³"}</td>
+                <td style={{ padding: "8px 8px", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.popis || "—"}</td>
+                <td style={{ padding: "8px 8px", fontWeight: 700, fontFamily: fm, color: t.typ === "prijem" ? P.green : P.red, whiteSpace: "nowrap" }}>{t.typ === "prijem" ? "+" : "−"}{fmt(t.cena_s_dph)}</td>
+                <td style={{ padding: "8px 8px", textAlign: "center" }}>{t.typ_platby === "hotovost" ? "💵" : "💳"}</td>
                 <td style={{ padding: "8px 8px", textAlign: "center" }}>
                   {t.priloha_url ? (
                     <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 99, background: P.blueBg, color: P.blue, cursor: "pointer" }}
-                      onClick={e => { e.stopPropagation(); setPreviewUrl(t.priloha_url); }}>ð NÃ¡hled</span>
-                  ) : <span style={{ color: P.ink3, fontSize: 11 }}>â</span>}
+                      onClick={e => { e.stopPropagation(); setPreviewUrl(t.priloha_url); }}>📎 Náhled</span>
+                  ) : <span style={{ color: P.ink3, fontSize: 11 }}>—</span>}
                 </td>
                 <td style={{ padding: "8px 8px", textAlign: "center" }}>
                   {t.approved
-                    ? <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 99, background: P.greenBg, color: P.green }}>â SchvÃ¡leno</span>
-                    : !t.storno && <button onClick={async e => { e.stopPropagation(); try { await store.approveTx(t.id, user.id); nt("SchvÃ¡leno â"); } catch(err) { nt("Chyba: "+err.message,"error"); } }}
-                        style={{ ...sB, fontSize: 10, padding: "2px 8px", background: "transparent", color: P.orange, border: `1px solid ${P.orange}`, borderRadius: 99 }}>SchvÃ¡lit</button>
+                    ? <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 99, background: P.greenBg, color: P.green }}>✓ Schváleno</span>
+                    : !t.storno && <button onClick={async e => { e.stopPropagation(); try { await store.approveTx(t.id, user.id); nt("Schváleno ✓"); } catch(err) { nt("Chyba: "+err.message,"error"); } }}
+                        style={{ ...sB, fontSize: 10, padding: "2px 8px", background: "transparent", color: P.orange, border: `1px solid ${P.orange}`, borderRadius: 99 }}>Schválit</button>
                   }
                 </td>
                 <td style={{ padding: "8px 8px", whiteSpace: "nowrap" }} onClick={e => e.stopPropagation()}>
@@ -1185,22 +1171,22 @@ function OverviewTab({ store, nt, user, visibleFirmyIds }) {
             ))}
           </tbody>
         </table>
-        {txs.length === 0 && <p style={{ textAlign: "center", color: P.ink3, padding: 24 }}>Å½Ã¡dnÃ© transakce</p>}
+        {txs.length === 0 && <p style={{ textAlign: "center", color: P.ink3, padding: 24 }}>Žádné transakce</p>}
       </div>
-      <p style={{ fontSize: 12, color: P.ink3, marginTop: 8 }}>{txs.length} transakcÃ­{txs.filter(t => t.storno).length > 0 ? ` (${txs.filter(t => t.storno).length} stornovÃ¡no)` : ""}</p>
+      <p style={{ fontSize: 12, color: P.ink3, marginTop: 8 }}>{txs.length} transakcí{txs.filter(t => t.storno).length > 0 ? ` (${txs.filter(t => t.storno).length} stornováno)` : ""}</p>
 
       {/* Attachment preview modal */}
       {previewUrl && (
         <div onClick={() => setPreviewUrl(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", zIndex: 9997, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
           <div style={{ ...sC, maxWidth: 500, width: "100%", textAlign: "center" }} onClick={e => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>ð NÃ¡hled dokladu</h3>
+              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>📎 Náhled dokladu</h3>
               <button style={{ ...sB, background: "transparent", color: P.ink2, padding: "4px 8px" }} onClick={() => setPreviewUrl(null)}><Ic d={ic.x} s={16} /></button>
             </div>
             <div style={{ background: "#f5f5f0", borderRadius: 8, padding: 20, fontSize: 14, color: P.ink2 }}>
-              <div style={{ fontSize: 48, marginBottom: 8 }}>ð</div>
+              <div style={{ fontSize: 48, marginBottom: 8 }}>📄</div>
               <p style={{ fontFamily: fm, fontSize: 13 }}>{previewUrl}</p>
-              <p style={{ fontSize: 12, color: P.ink3, marginTop: 8 }}>Po nasazenÃ­ na Vercel se zde zobrazÃ­ skuteÄnÃ½ nÃ¡hled souboru z Google Drive.</p>
+              <p style={{ fontSize: 12, color: P.ink3, marginTop: 8 }}>Po nasazení na Vercel se zde zobrazí skutečný náhled souboru z Google Drive.</p>
             </div>
           </div>
         </div>
@@ -1224,7 +1210,7 @@ function TxDetail({ store, txId, user, onClose, nt }) {
   const katName = lu(t.kategorie_id, store.kategorie);
   const history = t.history || [];
 
-  const actionLabel = { vytvoreno: "VytvoÅeno", uprava: "Upraveno", storno: "StornovÃ¡no", schvaleno: "SchvÃ¡leno" };
+  const actionLabel = { vytvoreno: "Vytvořeno", uprava: "Upraveno", storno: "Stornováno", schvaleno: "Schváleno" };
   const actionColor = { vytvoreno: P.blue, uprava: P.orange, storno: P.red, schvaleno: P.green };
 
   return (
@@ -1239,15 +1225,15 @@ function TxDetail({ store, txId, user, onClose, nt }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 20px", marginBottom: 20 }}>
           {[
             ["Datum", `${fD(t.created_at)} ${fT(t.created_at)}`],
-            ["ZamÄstnanec", zamName],
+            ["Zaměstnanec", zamName],
             ["Firma", firmaName],
-            ["Typ", t.is_vklad ? (t.typ === "prijem" ? "Vklad" : "VÃ½bÄr") : (t.typ === "prijem" ? "PÅÃ­jem" : "VÃ½daj")],
+            ["Typ", t.is_vklad ? (t.typ === "prijem" ? "Vklad" : "Výběr") : (t.typ === "prijem" ? "Příjem" : "Výdaj")],
             ["Kategorie", katName],
             ["Platba", t.typ_platby === "hotovost" ? "Hotovost" : "Karta"],
-            [t.typ === "prijem" ? "OdbÄratel" : "Dodavatel", t.dodavatel || "â"],
-            ["Popis", t.popis || "â"],
-            ["Bez DPH", `${fmt(t.cena_bez_dph)} KÄ`],
-            ["S DPH", `${fmt(t.cena_s_dph)} KÄ`],
+            [t.typ === "prijem" ? "Odběratel" : "Dodavatel", t.dodavatel || "—"],
+            ["Popis", t.popis || "—"],
+            ["Bez DPH", `${fmt(t.cena_bez_dph)} Kč`],
+            ["S DPH", `${fmt(t.cena_s_dph)} Kč`],
           ].map(([label, val]) => (
             <div key={label}>
               <div style={{ fontSize: 11, fontWeight: 600, color: P.ink3, textTransform: "uppercase", marginBottom: 2 }}>{label}</div>
@@ -1258,33 +1244,33 @@ function TxDetail({ store, txId, user, onClose, nt }) {
 
         {/* Status badges */}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
-          {t.storno && <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99, background: P.redBg, color: P.red }}>STORNOVÃNO</span>}
+          {t.storno && <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99, background: P.redBg, color: P.red }}>STORNOVÁNO</span>}
           {t.edited && <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99, background: P.orangeBg, color: P.orange }}>UPRAVENO</span>}
-          {t.approved && <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99, background: P.greenBg, color: P.green }}>â SCHVÃLENO</span>}
-          {!t.approved && !t.storno && <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99, background: "#f0f0ec", color: P.ink3 }}>ÄekÃ¡ na schvÃ¡lenÃ­</span>}
+          {t.approved && <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99, background: P.greenBg, color: P.green }}>✓ SCHVÁLENO</span>}
+          {!t.approved && !t.storno && <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99, background: "#f0f0ec", color: P.ink3 }}>Čeká na schválení</span>}
         </div>
 
         {/* Attachment */}
         {t.priloha_url && (
           <div style={{ ...sC, padding: "12px 16px", marginBottom: 16, background: P.blueBg, borderColor: "#b7cfe8" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: P.blue, marginBottom: 4 }}>ð PÅÃ­loha</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: P.blue, marginBottom: 4 }}>📎 Příloha</div>
             <div style={{ fontSize: 13, fontFamily: fm, color: P.ink2 }}>{t.priloha_url}</div>
-            <p style={{ fontSize: 11, color: P.ink3, margin: "6px 0 0" }}>NÃ¡hled bude dostupnÃ½ po nasazenÃ­ na Vercel + Google Drive.</p>
+            <p style={{ fontSize: 11, color: P.ink3, margin: "6px 0 0" }}>Náhled bude dostupný po nasazení na Vercel + Google Drive.</p>
           </div>
         )}
 
         {/* Approve button */}
         {!t.approved && !t.storno && (
           <button style={{ ...sB, background: P.green, color: "#fff", width: "100%", justifyContent: "center", padding: "10px", marginBottom: 16 }}
-            onClick={async () => { try { await store.approveTx(t.id, user.id); nt("Doklad schvÃ¡len â"); } catch(e) { nt("Chyba: "+e.message,"error"); } }}>
-            â SchvÃ¡lit transakci
+            onClick={async () => { try { await store.approveTx(t.id, user.id); nt("Doklad schválen ✓"); } catch(e) { nt("Chyba: "+e.message,"error"); } }}>
+            ✓ Schválit transakci
           </button>
         )}
 
         {/* History */}
-        <div style={{ fontSize: 13, fontWeight: 700, color: P.ink2, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".03em" }}>Historie zmÄn</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: P.ink2, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".03em" }}>Historie změn</div>
         {history.length === 0 ? (
-          <p style={{ color: P.ink3, fontSize: 13 }}>Å½Ã¡dnÃ¡ historie (starÅ¡Ã­ transakce)</p>
+          <p style={{ color: P.ink3, fontSize: 13 }}>Žádná historie (starší transakce)</p>
         ) : (
           <div style={{ position: "relative", paddingLeft: 20 }}>
             {/* Timeline line */}
@@ -1298,10 +1284,10 @@ function TxDetail({ store, txId, user, onClose, nt }) {
                   <span style={{ fontSize: 11, fontFamily: fm, color: P.ink3 }}>{fD(h.time)} {fT(h.time)}</span>
                 </div>
                 <div style={{ fontSize: 12, color: P.ink2, marginTop: 2 }}>{lu(h.user_id, store.zamestnanci, "jmeno")}</div>
-                {h.pozn && <div style={{ fontSize: 12, color: P.ink2, fontStyle: "italic", marginTop: 2 }}>â{h.pozn}"</div>}
+                {h.pozn && <div style={{ fontSize: 12, color: P.ink2, fontStyle: "italic", marginTop: 2 }}>„{h.pozn}"</div>}
                 {h.before && (
                   <div style={{ fontSize: 11, color: P.ink3, marginTop: 4, background: "#f5f5f0", padding: "4px 8px", borderRadius: 4 }}>
-                    PÅedchozÃ­: {h.before.popis && `popis: "${h.before.popis}"`} {h.before.cena_s_dph && `| s DPH: ${fmt(h.before.cena_s_dph)}`} {h.before.dodavatel && `| dodavatel: "${h.before.dodavatel}"`}
+                    Předchozí: {h.before.popis && `popis: "${h.before.popis}"`} {h.before.cena_s_dph && `| s DPH: ${fmt(h.before.cena_s_dph)}`} {h.before.dodavatel && `| dodavatel: "${h.before.dodavatel}"`}
                   </div>
                 )}
               </div>
@@ -1377,7 +1363,7 @@ function DashboardTab({ store, visibleFirmyIds }) {
     <div>
       {/* Period toggle */}
       <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
-        {[["week", "PoslednÃ­ch 7 dnÃ­"], ["month", "PoslednÃ­ch 30 dnÃ­"]].map(([v, l]) => (
+        {[["week", "Posledních 7 dní"], ["month", "Posledních 30 dní"]].map(([v, l]) => (
           <button key={v} onClick={() => setPeriod(v)} style={{
             ...sB, background: period === v ? P.ink : "transparent", color: period === v ? "#fff" : P.ink2,
             border: `1.5px solid ${period === v ? P.ink : P.border}`, padding: "7px 14px",
@@ -1387,7 +1373,7 @@ function DashboardTab({ store, visibleFirmyIds }) {
 
       {/* Daily chart */}
       <div style={{ ...sC, marginBottom: 16 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>ð PÅÃ­jmy vs VÃ½daje (dennÄ)</div>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>📈 Příjmy vs Výdaje (denně)</div>
         <div style={{ display: "flex", gap: 2, alignItems: "flex-end", height: 160, padding: "0 4px" }}>
           {dailyData.map((d, i) => (
             <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, height: "100%", justifyContent: "flex-end" }}>
@@ -1400,20 +1386,20 @@ function DashboardTab({ store, visibleFirmyIds }) {
           ))}
         </div>
         <div style={{ display: "flex", gap: 16, justifyContent: "center", marginTop: 12 }}>
-          <span style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 10, height: 10, background: P.green, borderRadius: 2, display: "inline-block" }} /> PÅÃ­jmy</span>
-          <span style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 10, height: 10, background: P.red, borderRadius: 2, display: "inline-block" }} /> VÃ½daje</span>
+          <span style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 10, height: 10, background: P.green, borderRadius: 2, display: "inline-block" }} /> Příjmy</span>
+          <span style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 10, height: 10, background: P.red, borderRadius: 2, display: "inline-block" }} /> Výdaje</span>
         </div>
       </div>
 
       {/* Top categories per firm */}
       <div style={{ ...sC, marginBottom: 16 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>ð·ï¸ Top kategorie vÃ½dajÅ¯ dle firem</div>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>🏷️ Top kategorie výdajů dle firem</div>
         {Object.values(catSpendPerFirm).map(firm => {
           const maxVal = firm.cats[0]?.[1] || 1;
           return (
             <div key={firm.nazev} style={{ marginBottom: 18 }}>
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: P.ink, padding: "4px 0", borderBottom: `1px solid ${P.border}` }}>{firm.nazev}</div>
-              {firm.cats.length === 0 ? <p style={{ color: P.ink3, fontSize: 13, margin: "4px 0" }}>Å½Ã¡dnÃ© vÃ½daje</p> : (
+              {firm.cats.length === 0 ? <p style={{ color: P.ink3, fontSize: 13, margin: "4px 0" }}>Žádné výdaje</p> : (
                 firm.cats.map(([name, val]) => <Bar key={name} label={name} value={val} max={maxVal} color={P.red} />)
               )}
             </div>
@@ -1423,14 +1409,14 @@ function DashboardTab({ store, visibleFirmyIds }) {
 
       {/* Per-firm comparison */}
       <div style={{ ...sC }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>ð¢ PorovnÃ¡nÃ­ firem</div>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>🏢 Porovnání firem</div>
         {firmTotals.map(f => (
           <div key={f.nazev} style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>{f.nazev}</div>
-            <Bar label="PÅÃ­jmy" value={f.prijmy} max={Math.max(f.prijmy, f.vydaje, 1)} color={P.green} />
-            <Bar label="VÃ½daje" value={f.vydaje} max={Math.max(f.prijmy, f.vydaje, 1)} color={P.red} />
+            <Bar label="Příjmy" value={f.prijmy} max={Math.max(f.prijmy, f.vydaje, 1)} color={P.green} />
+            <Bar label="Výdaje" value={f.vydaje} max={Math.max(f.prijmy, f.vydaje, 1)} color={P.red} />
             <div style={{ fontSize: 12, fontFamily: fm, fontWeight: 700, textAlign: "right", color: f.prijmy - f.vydaje >= 0 ? P.green : P.red, marginTop: 2 }}>
-              Saldo: {fmt(f.prijmy - f.vydaje)} KÄ
+              Saldo: {fmt(f.prijmy - f.vydaje)} Kč
             </div>
           </div>
         ))}
@@ -1446,11 +1432,11 @@ function LimitsTab({ store, nt }) {
   const [form, setForm] = useState({ typ: "mesicni", target_type: "zamestnanec", target_id: "", limit_czk: "" });
 
   const add = async () => {
-    if (!form.target_id || !form.limit_czk) return nt("VyplÅte cÃ­l a limit", "error");
+    if (!form.target_id || !form.limit_czk) return nt("Vyplňte cíl a limit", "error");
     try {
       await store.addLimit({ typ: form.typ, target_type: form.target_type, target_id: Number(form.target_id), limit_czk: Number(form.limit_czk) });
       setForm({ typ: "mesicni", target_type: "zamestnanec", target_id: "", limit_czk: "" });
-      nt("Limit pÅidÃ¡n â");
+      nt("Limit přidán ✓");
     } catch(e) { nt("Chyba: "+e.message, "error"); }
   };
 
@@ -1464,45 +1450,45 @@ function LimitsTab({ store, nt }) {
   return (
     <div>
       <div style={{ ...sC, marginBottom: 20 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>PÅidat vÃ½dajovÃ½ limit</div>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>Přidat výdajový limit</div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
           <div style={{ flex: "0 0 auto" }}>
-            <Fl l="ObdobÃ­">
+            <Fl l="Období">
               <select style={sI} value={form.typ} onChange={e => setForm(p => ({ ...p, typ: e.target.value }))}>
-                <option value="denny">DennÃ­</option>
-                <option value="mesicni">MÄsÃ­ÄnÃ­</option>
+                <option value="denny">Denní</option>
+                <option value="mesicni">Měsíční</option>
               </select>
             </Fl>
           </div>
           <div style={{ flex: "0 0 auto" }}>
-            <Fl l="Typ cÃ­le">
+            <Fl l="Typ cíle">
               <select style={sI} value={form.target_type} onChange={e => setForm(p => ({ ...p, target_type: e.target.value, target_id: "" }))}>
-                <option value="zamestnanec">ZamÄstnanec</option>
+                <option value="zamestnanec">Zaměstnanec</option>
                 <option value="kategorie">Kategorie</option>
               </select>
             </Fl>
           </div>
           <div style={{ flex: 1, minWidth: 140 }}>
-            <Fl l={form.target_type === "zamestnanec" ? "ZamÄstnanec" : "Kategorie"}>
+            <Fl l={form.target_type === "zamestnanec" ? "Zaměstnanec" : "Kategorie"}>
               <select style={sI} value={form.target_id} onChange={e => setForm(p => ({ ...p, target_id: e.target.value }))}>
-                <option value="">â Vyberte â</option>
+                <option value="">— Vyberte —</option>
                 {targetOptions.map(o => <option key={o.id} value={o.id}>{o.jmeno || o.nazev}</option>)}
               </select>
             </Fl>
           </div>
           <div style={{ flex: 0, minWidth: 120 }}>
-            <Fl l="Limit (KÄ)">
+            <Fl l="Limit (Kč)">
               <input style={{ ...sI, fontFamily: fm }} type="number" placeholder="10000" value={form.limit_czk} onChange={e => setForm(p => ({ ...p, limit_czk: e.target.value }))} />
             </Fl>
           </div>
-          <button style={{ ...sB, background: P.accent, color: "#fff", marginBottom: 14 }} onClick={add}>PÅidat</button>
+          <button style={{ ...sB, background: P.accent, color: "#fff", marginBottom: 14 }} onClick={add}>Přidat</button>
         </div>
       </div>
 
       {/* Active limits with current spending */}
-      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>AktivnÃ­ limity</div>
+      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>Aktivní limity</div>
       {store.limits.length === 0 ? (
-        <p style={{ color: P.ink3, textAlign: "center", padding: 24 }}>ZatÃ­m Å¾Ã¡dnÃ© limity. PÅidejte limit vÃ½Å¡e.</p>
+        <p style={{ color: P.ink3, textAlign: "center", padding: 24 }}>Zatím žádné limity. Přidejte limit výše.</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {store.limits.map(lim => {
@@ -1526,21 +1512,21 @@ function LimitsTab({ store, nt }) {
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontWeight: 700, fontSize: 14 }}>{targetName}</span>
                     <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 99, background: lim.typ === "denny" ? P.blueBg : P.orangeBg, color: lim.typ === "denny" ? P.blue : P.orange }}>
-                      {lim.typ === "denny" ? "DennÃ­" : "MÄsÃ­ÄnÃ­"}
+                      {lim.typ === "denny" ? "Denní" : "Měsíční"}
                     </span>
-                    <span style={{ fontSize: 11, color: P.ink3 }}>{lim.target_type === "zamestnanec" ? "ð¤" : "ð·ï¸"}</span>
+                    <span style={{ fontSize: 11, color: P.ink3 }}>{lim.target_type === "zamestnanec" ? "👤" : "🏷️"}</span>
                   </div>
-                  <button style={{ ...sB, background: P.red, color: "#fff", fontSize: 11, padding: "4px 10px" }} onClick={async () => { try { await store.delLimit(lim.id); nt("Limit odstranÄn"); } catch(e) { nt("Chyba: "+e.message,"error"); } }}>Smazat</button>
+                  <button style={{ ...sB, background: P.red, color: "#fff", fontSize: 11, padding: "4px 10px" }} onClick={async () => { try { await store.delLimit(lim.id); nt("Limit odstraněn"); } catch(e) { nt("Chyba: "+e.message,"error"); } }}>Smazat</button>
                 </div>
                 {/* Progress bar */}
                 <div style={{ height: 8, background: "#f0f0ec", borderRadius: 4, overflow: "hidden", marginBottom: 6 }}>
                   <div style={{ height: "100%", width: `${pct}%`, background: exceeded ? P.red : pct > 80 ? P.orange : P.green, borderRadius: 4, transition: "width .3s" }} />
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-                  <span style={{ fontFamily: fm, fontWeight: 600, color: exceeded ? P.red : P.ink2 }}>{fmt(spent)} KÄ</span>
-                  <span style={{ fontFamily: fm, color: P.ink3 }}>z {fmt(lim.limit_czk)} KÄ ({Math.round(pct)}%)</span>
+                  <span style={{ fontFamily: fm, fontWeight: 600, color: exceeded ? P.red : P.ink2 }}>{fmt(spent)} Kč</span>
+                  <span style={{ fontFamily: fm, color: P.ink3 }}>z {fmt(lim.limit_czk)} Kč ({Math.round(pct)}%)</span>
                 </div>
-                {exceeded && <div style={{ fontSize: 12, fontWeight: 700, color: P.red, marginTop: 4 }}>â ï¸ Limit pÅekroÄen o {fmt(spent - lim.limit_czk)} KÄ!</div>}
+                {exceeded && <div style={{ fontSize: 12, fontWeight: 700, color: P.red, marginTop: 4 }}>⚠️ Limit překročen o {fmt(spent - lim.limit_czk)} Kč!</div>}
               </div>
             );
           })}
@@ -1560,7 +1546,7 @@ function EditDialog({ store, txId, userId, onClose, nt }) {
   if (!t) return null;
 
   const save = async () => {
-    if (!pozn.trim()) return nt("VyplÅte dÅ¯vod Ãºpravy", "error");
+    if (!pozn.trim()) return nt("Vyplňte důvod úpravy", "error");
     try {
       await store.editTx(txId, f, pozn.trim(), userId);
       nt("Transakce upravena"); onClose();
@@ -1572,15 +1558,15 @@ function EditDialog({ store, txId, userId, onClose, nt }) {
       <div style={{ ...sC, maxWidth: 420, width: "100%" }}>
         <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700 }}>Upravit transakci</h3>
         <Fl l="Popis"><input style={sI} value={f.popis} onChange={e => setF(p => ({ ...p, popis: e.target.value }))} /></Fl>
-        <Fl l="Dodavatel / OdbÄratel"><input style={sI} value={f.dodavatel} onChange={e => setF(p => ({ ...p, dodavatel: e.target.value }))} /></Fl>
+        <Fl l="Dodavatel / Odběratel"><input style={sI} value={f.dodavatel} onChange={e => setF(p => ({ ...p, dodavatel: e.target.value }))} /></Fl>
         <div style={{ display: "flex", gap: 10 }}>
           <Fl l="Bez DPH" s={{ flex: 1 }}><input style={sI} type="number" step="0.01" value={f.cena_bez_dph} onChange={e => setF(p => ({ ...p, cena_bez_dph: Number(e.target.value) }))} /></Fl>
           <Fl l="S DPH" s={{ flex: 1 }}><input style={sI} type="number" step="0.01" value={f.cena_s_dph} onChange={e => setF(p => ({ ...p, cena_s_dph: Number(e.target.value) }))} /></Fl>
         </div>
-        <Fl l="DÅ¯vod Ãºpravy (povinnÃ©)"><input style={sI} placeholder="ProÄ mÄnÃ­te transakci?" value={pozn} onChange={e => setPozn(e.target.value)} /></Fl>
+        <Fl l="Důvod úpravy (povinné)"><input style={sI} placeholder="Proč měníte transakci?" value={pozn} onChange={e => setPozn(e.target.value)} /></Fl>
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button style={{ ...sB, background: "transparent", color: P.ink2, border: `1.5px solid ${P.border}` }} onClick={onClose}>ZruÅ¡it</button>
-          <button style={{ ...sB, background: P.accent, color: "#fff" }} onClick={save}>UloÅ¾it zmÄny</button>
+          <button style={{ ...sB, background: "transparent", color: P.ink2, border: `1.5px solid ${P.border}` }} onClick={onClose}>Zrušit</button>
+          <button style={{ ...sB, background: P.accent, color: "#fff" }} onClick={save}>Uložit změny</button>
         </div>
       </div>
     </div>
@@ -1595,7 +1581,7 @@ function SheetsTab({ store }) {
     <div>
       {/* Sheets config */}
       <div style={{ ...sC, marginBottom: 16 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>ð Google Sheets â napojenÃ© spreadsheets</div>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>📊 Google Sheets – napojené spreadsheets</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {store.firmy.map(f => {
             const hasSid = !!f.spreadsheet_id;
@@ -1603,10 +1589,10 @@ function SheetsTab({ store }) {
               <div key={f.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#fafaf8", borderRadius: 8 }}>
                 <div>
                   <span style={{ fontWeight: 600, fontSize: 14 }}>{f.nazev}</span>
-                  {hasSid && <span style={{ marginLeft: 8, fontSize: 11, fontFamily: fm, color: P.ink3 }}>ID: {f.spreadsheet_id.slice(0, 12)}â¦</span>}
+                  {hasSid && <span style={{ marginLeft: 8, fontSize: 11, fontFamily: fm, color: P.ink3 }}>ID: {f.spreadsheet_id.slice(0, 12)}…</span>}
                 </div>
                 <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 99, background: hasSid ? P.greenBg : P.redBg, color: hasSid ? P.green : P.red }}>
-                  {hasSid ? "â Napojeno" : "â Nenastaveno"}
+                  {hasSid ? "✓ Napojeno" : "✗ Nenastaveno"}
                 </span>
               </div>
             );
@@ -1616,17 +1602,17 @@ function SheetsTab({ store }) {
 
       {/* Drive config */}
       <div style={{ ...sC, marginBottom: 16 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>ð Google Drive â ÃºloÅ¾iÅ¡tÄ dokladÅ¯</div>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>📁 Google Drive – úložiště dokladů</div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#fafaf8", borderRadius: 8 }}>
           <div>
-            <span style={{ fontWeight: 600, fontSize: 14 }}>KoÅenovÃ¡ sloÅ¾ka</span>
-            <span style={{ marginLeft: 8, fontSize: 11, fontFamily: fm, color: P.ink3 }}>ID: {DRIVE_ROOT_FOLDER_ID.slice(0, 16)}â¦</span>
+            <span style={{ fontWeight: 600, fontSize: 14 }}>Kořenová složka</span>
+            <span style={{ marginLeft: 8, fontSize: 11, fontFamily: fm, color: P.ink3 }}>ID: {DRIVE_ROOT_FOLDER_ID.slice(0, 16)}…</span>
           </div>
-          <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 99, background: P.greenBg, color: P.green }}>â Nastaveno</span>
+          <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 99, background: P.greenBg, color: P.green }}>✓ Nastaveno</span>
         </div>
         <p style={{ fontSize: 12, color: P.ink3, marginTop: 10, lineHeight: 1.5, margin: "10px 0 0" }}>
-          Struktura: <span style={{ fontFamily: fm, fontSize: 11 }}>KoÅenovÃ¡ sloÅ¾ka / [Firma] / [ZamÄstnanec] / doklady</span><br />
-          PodsloÅ¾ky se vytvÃ¡ÅÃ­ automaticky pÅi prvnÃ­m nahrÃ¡nÃ­.
+          Struktura: <span style={{ fontFamily: fm, fontSize: 11 }}>Kořenová složka / [Firma] / [Zaměstnanec] / doklady</span><br />
+          Podsložky se vytváří automaticky při prvním nahrání.
         </p>
       </div>
 
@@ -1634,14 +1620,14 @@ function SheetsTab({ store }) {
       <div style={{ ...sC, marginBottom: 20, padding: "14px 18px" }}>
         <p style={{ fontSize: 12, color: P.ink3, margin: 0, lineHeight: 1.5 }}>
           Service account: <span style={{ fontFamily: fm, fontSize: 11 }}>pokladni-denik-export@pokladni-denik.iam.gserviceaccount.com</span><br />
-          Stav: <strong style={{ color: P.orange }}>Simulace</strong> â po nasazenÃ­ na Vercel bude Sheets export i Drive upload aktivnÃ­.
+          Stav: <strong style={{ color: P.orange }}>Simulace</strong> – po nasazení na Vercel bude Sheets export i Drive upload aktivní.
         </p>
       </div>
 
       {/* Sheets export log */}
-      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>ð Historie exportÅ¯ do Sheets</div>
+      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>📊 Historie exportů do Sheets</div>
       {store.sheetsLog.length === 0 ? (
-        <p style={{ color: P.ink3, textAlign: "center", padding: 20, fontSize: 14 }}>ZatÃ­m Å¾Ã¡dnÃ© exporty.</p>
+        <p style={{ color: P.ink3, textAlign: "center", padding: 20, fontSize: 14 }}>Zatím žádné exporty.</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 24 }}>
           {store.sheetsLog.map(l => (
@@ -1649,10 +1635,10 @@ function SheetsTab({ store }) {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 99, background: l.status === "simulated" ? P.orangeBg : P.greenBg, color: l.status === "simulated" ? P.orange : P.green }}>
-                    {l.status === "simulated" ? "SIMULACE" : "ODESLÃNO"}
+                    {l.status === "simulated" ? "SIMULACE" : "ODESLÁNO"}
                   </span>
                   <span style={{ fontWeight: 600, fontSize: 13 }}>{l.spreadsheet}</span>
-                  <span style={{ color: P.ink3, fontSize: 13 }}>â list â{l.sheet}"</span>
+                  <span style={{ color: P.ink3, fontSize: 13 }}>→ list „{l.sheet}"</span>
                 </div>
                 <span style={{ fontSize: 12, color: P.ink3, fontFamily: fm }}>{fD(l.time)} {fT(l.time)}</span>
               </div>
@@ -1669,9 +1655,9 @@ function SheetsTab({ store }) {
       )}
 
       {/* Drive upload log */}
-      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>ð Historie uploadÅ¯ na Drive</div>
+      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>📁 Historie uploadů na Drive</div>
       {store.driveLog.length === 0 ? (
-        <p style={{ color: P.ink3, textAlign: "center", padding: 20, fontSize: 14 }}>ZatÃ­m Å¾Ã¡dnÃ© uploady. Nahrajte doklad k transakci a uvidÃ­te ho zde.</p>
+        <p style={{ color: P.ink3, textAlign: "center", padding: 20, fontSize: 14 }}>Zatím žádné uploady. Nahrajte doklad k transakci a uvidíte ho zde.</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {store.driveLog.map(l => (
@@ -1679,14 +1665,14 @@ function SheetsTab({ store }) {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 99, background: l.status === "simulated" ? P.orangeBg : P.greenBg, color: l.status === "simulated" ? P.orange : P.green }}>
-                    {l.status === "simulated" ? "SIMULACE" : "NAHRÃNO"}
+                    {l.status === "simulated" ? "SIMULACE" : "NAHRÁNO"}
                   </span>
-                  <span style={{ fontWeight: 600, fontSize: 13 }}>ð {l.fileName}</span>
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>📄 {l.fileName}</span>
                 </div>
                 <span style={{ fontSize: 12, color: P.ink3, fontFamily: fm }}>{fD(l.time)} {fT(l.time)}</span>
               </div>
               <div style={{ fontSize: 12, color: P.ink2, marginTop: 4, fontFamily: fm }}>
-                ð {l.path}
+                📂 {l.path}
               </div>
             </div>
           ))}
@@ -1701,7 +1687,7 @@ function SheetsTab({ store }) {
 // ============================================================
 function NotifTab({ store }) {
   useEffect(() => { store.markNotifsRead(); }, []);
-  if (store.notifs.length === 0) return <p style={{ color: P.ink3, textAlign: "center", padding: 30 }}>Å½Ã¡dnÃ© notifikace</p>;
+  if (store.notifs.length === 0) return <p style={{ color: P.ink3, textAlign: "center", padding: 30 }}>Žádné notifikace</p>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {store.notifs.map(n => (
@@ -1709,14 +1695,14 @@ function NotifTab({ store }) {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
               <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 99, background: n.type === "storno" ? P.redBg : P.orangeBg, color: n.type === "storno" ? P.red : P.orange }}>
-                {n.type === "storno" ? "STORNO" : "ÃPRAVA"}
+                {n.type === "storno" ? "STORNO" : "ÚPRAVA"}
               </span>
               <span style={{ marginLeft: 8, fontSize: 13, fontWeight: 600 }}>{lu(n.user_id, store.zamestnanci, "jmeno")}</span>
-              <span style={{ marginLeft: 6, fontSize: 13, color: P.ink2 }}>â {n.popis || "transakce"}</span>
+              <span style={{ marginLeft: 6, fontSize: 13, color: P.ink2 }}>– {n.popis || "transakce"}</span>
             </div>
             <span style={{ fontSize: 12, color: P.ink3, fontFamily: fm }}>{fD(n.time)} {fT(n.time)}</span>
           </div>
-          {n.pozn && <p style={{ margin: "6px 0 0", fontSize: 13, color: P.ink2, fontStyle: "italic" }}>â{n.pozn}"</p>}
+          {n.pozn && <p style={{ margin: "6px 0 0", fontSize: 13, color: P.ink2, fontStyle: "italic" }}>„{n.pozn}"</p>}
         </div>
       ))}
     </div>
@@ -1730,32 +1716,32 @@ function EmpTab({ store, nt }) {
   const [form, setForm] = useState({ jmeno: "", pin: "", role: "zamestnanec" });
   const [editId, setEditId] = useState(null);
   const save = async () => {
-    if (!form.jmeno.trim() || !form.pin.trim()) return nt("VyplÅte jmÃ©no a PIN", "error");
-    if (form.pin.length !== 4 || !/^\d+$/.test(form.pin)) return nt("PIN musÃ­ bÃ½t 4 ÄÃ­slice", "error");
+    if (!form.jmeno.trim() || !form.pin.trim()) return nt("Vyplňte jméno a PIN", "error");
+    if (form.pin.length !== 4 || !/^\d+$/.test(form.pin)) return nt("PIN musí být 4 číslice", "error");
     try {
-      if (editId) { await store.updateZam(editId, form); nt("ZamÄstnanec upraven"); }
-      else { await store.addZam(form); nt("ZamÄstnanec pÅidÃ¡n"); }
+      if (editId) { await store.updateZam(editId, form); nt("Zaměstnanec upraven"); }
+      else { await store.addZam(form); nt("Zaměstnanec přidán"); }
       setForm({ jmeno: "", pin: "", role: "zamestnanec" }); setEditId(null);
     } catch(e) { nt("Chyba: "+e.message, "error"); }
   };
   return (
     <div>
       <div style={{ ...sC, marginBottom: 20 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>{editId ? "Upravit zamÄstnance" : "PÅidat zamÄstnance"}</div>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>{editId ? "Upravit zaměstnance" : "Přidat zaměstnance"}</div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-          <div style={{ flex: 1, minWidth: 130 }}><Fl l="JmÃ©no"><input style={sI} value={form.jmeno} onChange={e => setForm(p => ({ ...p, jmeno: e.target.value }))} /></Fl></div>
-          <div style={{ flex: 0, minWidth: 90 }}><Fl l="PIN (4 ÄÃ­slice)"><input style={{ ...sI, fontFamily: fm, letterSpacing: 4, textAlign: "center" }} maxLength={4} value={form.pin} onChange={e => setForm(p => ({ ...p, pin: e.target.value.replace(/\D/g, "").slice(0, 4) }))} /></Fl></div>
+          <div style={{ flex: 1, minWidth: 130 }}><Fl l="Jméno"><input style={sI} value={form.jmeno} onChange={e => setForm(p => ({ ...p, jmeno: e.target.value }))} /></Fl></div>
+          <div style={{ flex: 0, minWidth: 90 }}><Fl l="PIN (4 číslice)"><input style={{ ...sI, fontFamily: fm, letterSpacing: 4, textAlign: "center" }} maxLength={4} value={form.pin} onChange={e => setForm(p => ({ ...p, pin: e.target.value.replace(/\D/g, "").slice(0, 4) }))} /></Fl></div>
           <div style={{ flex: 0, minWidth: 120 }}>
             <Fl l="Role">
               <select style={sI} value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))}>
-                <option value="zamestnanec">ZamÄstnanec</option>
-                <option value="manazer">ManaÅ¾er</option>
+                <option value="zamestnanec">Zaměstnanec</option>
+                <option value="manazer">Manažer</option>
                 <option value="superadmin">Superadmin</option>
               </select>
             </Fl>
           </div>
-          <button style={{ ...sB, background: P.accent, color: "#fff", marginBottom: 14 }} onClick={save}>{editId ? "UloÅ¾it" : "PÅidat"}</button>
-          {editId && <button style={{ ...sB, background: "transparent", color: P.ink2, marginBottom: 14 }} onClick={() => { setEditId(null); setForm({ jmeno: "", pin: "", role: "zamestnanec" }); }}>ZruÅ¡it</button>}
+          <button style={{ ...sB, background: P.accent, color: "#fff", marginBottom: 14 }} onClick={save}>{editId ? "Uložit" : "Přidat"}</button>
+          {editId && <button style={{ ...sB, background: "transparent", color: P.ink2, marginBottom: 14 }} onClick={() => { setEditId(null); setForm({ jmeno: "", pin: "", role: "zamestnanec" }); }}>Zrušit</button>}
         </div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1766,12 +1752,12 @@ function EmpTab({ store, nt }) {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: store.firmy.length > 0 ? 8 : 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <span style={{ fontWeight: 700, fontSize: 14 }}>{z.jmeno}</span>
-                  <span style={{ fontFamily: fm, fontSize: 12, color: P.ink3 }}>PIN: â¢â¢â¢â¢</span>
+                  <span style={{ fontFamily: fm, fontSize: 12, color: P.ink3 }}>PIN: ••••</span>
                   <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 99, background: roleColor[z.role] + "18", color: roleColor[z.role] }}>{roleLabel[z.role]}</span>
                 </div>
                 <div style={{ display: "flex", gap: 4 }}>
                   <button style={{ ...sB, background: "transparent", color: P.ink2, padding: "6px 10px" }} onClick={() => { setEditId(z.id); setForm({ jmeno: z.jmeno, pin: z.pin, role: z.role }); }}>Upravit</button>
-                  <button style={{ ...sB, background: P.red, color: "#fff", fontSize: 12, padding: "6px 12px" }} onClick={async () => { try { await store.delZam(z.id); nt("SmazÃ¡no"); } catch(e) { nt("Chyba: "+e.message,"error"); } }}>Smazat</button>
+                  <button style={{ ...sB, background: P.red, color: "#fff", fontSize: 12, padding: "6px 12px" }} onClick={async () => { try { await store.delZam(z.id); nt("Smazáno"); } catch(e) { nt("Chyba: "+e.message,"error"); } }}>Smazat</button>
                 </div>
               </div>
               {store.firmy.length > 0 && (
@@ -1808,28 +1794,28 @@ function CompTab({ store, nt }) {
 
   const add = async () => {
     if (!nazev.trim()) return;
-    try { await store.addFirma(nazev.trim(), sid.trim()); setNazev(""); setSid(""); nt("Firma pÅidÃ¡na"); }
+    try { await store.addFirma(nazev.trim(), sid.trim()); setNazev(""); setSid(""); nt("Firma přidána"); }
     catch(e) { nt("Chyba: "+e.message, "error"); }
   };
 
   const startEdit = (f) => { setEditId(f.id); setEditNazev(f.nazev); setEditSid(f.spreadsheet_id || ""); };
   const saveEdit = async () => {
-    try { await store.updateFirma(editId, { nazev: editNazev, spreadsheet_id: editSid.trim() }); setEditId(null); nt("Firma aktualizovÃ¡na"); }
+    try { await store.updateFirma(editId, { nazev: editNazev, spreadsheet_id: editSid.trim() }); setEditId(null); nt("Firma aktualizována"); }
     catch(e) { nt("Chyba: "+e.message, "error"); }
   };
 
   return (
     <div>
       <div style={{ ...sC, marginBottom: 20 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>PÅidat firmu</div>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>Přidat firmu</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "flex", gap: 10 }}>
-            <input style={{ ...sI, flex: 1 }} placeholder="NÃ¡zev firmy" value={nazev} onChange={e => setNazev(e.target.value)} />
-            <button style={{ ...sB, background: P.accent, color: "#fff" }} onClick={add}>PÅidat</button>
+            <input style={{ ...sI, flex: 1 }} placeholder="Název firmy" value={nazev} onChange={e => setNazev(e.target.value)} />
+            <button style={{ ...sB, background: P.accent, color: "#fff" }} onClick={add}>Přidat</button>
           </div>
-          <input style={sI} placeholder="Google Spreadsheet ID (volitelnÃ© â z URL spreadsheetu)" value={sid} onChange={e => setSid(e.target.value)} />
+          <input style={sI} placeholder="Google Spreadsheet ID (volitelné – z URL spreadsheetu)" value={sid} onChange={e => setSid(e.target.value)} />
           <p style={{ fontSize: 11, color: P.ink3, margin: 0, lineHeight: 1.4 }}>
-            Spreadsheet ID najdeÅ¡ v URL: docs.google.com/spreadsheets/d/<strong style={{ color: P.accent }}>TOTO_JE_ID</strong>/edit
+            Spreadsheet ID najdeš v URL: docs.google.com/spreadsheets/d/<strong style={{ color: P.accent }}>TOTO_JE_ID</strong>/edit
           </p>
         </div>
       </div>
@@ -1839,13 +1825,13 @@ function CompTab({ store, nt }) {
           <div key={f.id} style={{ ...sC, padding: "14px 18px" }}>
             {editId === f.id ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <Fl l="NÃ¡zev firmy"><input style={sI} value={editNazev} onChange={e => setEditNazev(e.target.value)} /></Fl>
+                <Fl l="Název firmy"><input style={sI} value={editNazev} onChange={e => setEditNazev(e.target.value)} /></Fl>
                 <Fl l="Google Spreadsheet ID">
                   <input style={{ ...sI, fontFamily: fm, fontSize: 12 }} placeholder="1aBcDeFgHiJkLmNoPqRsTuVwXyZ..." value={editSid} onChange={e => setEditSid(e.target.value)} />
                 </Fl>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button style={{ ...sB, background: P.accent, color: "#fff" }} onClick={saveEdit}>UloÅ¾it</button>
-                  <button style={{ ...sB, background: "transparent", color: P.ink2 }} onClick={() => setEditId(null)}>ZruÅ¡it</button>
+                  <button style={{ ...sB, background: P.accent, color: "#fff" }} onClick={saveEdit}>Uložit</button>
+                  <button style={{ ...sB, background: "transparent", color: P.ink2 }} onClick={() => setEditId(null)}>Zrušit</button>
                 </div>
               </div>
             ) : (
@@ -1854,18 +1840,18 @@ function CompTab({ store, nt }) {
                   <span style={{ fontWeight: 600 }}>{f.nazev}</span>
                   <div style={{ display: "flex", gap: 4 }}>
                     <button style={{ ...sB, background: "transparent", color: P.ink2, padding: "6px 10px" }} onClick={() => startEdit(f)}>Upravit</button>
-                    <button style={{ ...sB, background: P.red, color: "#fff", fontSize: 12, padding: "6px 12px" }} onClick={async () => { try { await store.delFirma(f.id); nt("SmazÃ¡no"); } catch(e) { nt("Chyba: "+e.message,"error"); } }}>Smazat</button>
+                    <button style={{ ...sB, background: P.red, color: "#fff", fontSize: 12, padding: "6px 12px" }} onClick={async () => { try { await store.delFirma(f.id); nt("Smazáno"); } catch(e) { nt("Chyba: "+e.message,"error"); } }}>Smazat</button>
                   </div>
                 </div>
                 {f.spreadsheet_id ? (
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 99, background: P.greenBg, color: P.green }}>â Sheets</span>
-                    <span style={{ fontSize: 11, fontFamily: fm, color: P.ink3 }}>ID: {f.spreadsheet_id.slice(0, 20)}â¦</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 99, background: P.greenBg, color: P.green }}>✓ Sheets</span>
+                    <span style={{ fontSize: 11, fontFamily: fm, color: P.ink3 }}>ID: {f.spreadsheet_id.slice(0, 20)}…</span>
                   </div>
                 ) : (
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 99, background: P.redBg, color: P.red }}>â Nepropojeno</span>
-                    <button style={{ ...sB, fontSize: 11, padding: "2px 8px", background: "transparent", color: P.blue }} onClick={() => startEdit(f)}>PÅidat Spreadsheet ID</button>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 99, background: P.redBg, color: P.red }}>✗ Nepropojeno</span>
+                    <button style={{ ...sB, fontSize: 11, padding: "2px 8px", background: "transparent", color: P.blue }} onClick={() => startEdit(f)}>Přidat Spreadsheet ID</button>
                   </div>
                 )}
               </>
@@ -1879,21 +1865,21 @@ function CompTab({ store, nt }) {
 
 function CatTab({ store, nt }) {
   const [form, setForm] = useState({ nazev: "", typ: "oba" });
-  const add = async () => { if (!form.nazev.trim()) return; try { await store.addKat({ nazev: form.nazev.trim(), typ: form.typ }); setForm({ nazev: "", typ: "oba" }); nt("Kategorie pÅidÃ¡na"); } catch(e) { nt("Chyba: "+e.message,"error"); } };
-  const tl = { prijem: "PÅÃ­jem", vydaj: "VÃ½daj", oba: "ObojÃ­" };
+  const add = async () => { if (!form.nazev.trim()) return; try { await store.addKat({ nazev: form.nazev.trim(), typ: form.typ }); setForm({ nazev: "", typ: "oba" }); nt("Kategorie přidána"); } catch(e) { nt("Chyba: "+e.message,"error"); } };
+  const tl = { prijem: "Příjem", vydaj: "Výdaj", oba: "Obojí" };
   const tc = { prijem: P.green, vydaj: P.red, oba: P.blue };
   return (
     <div>
       <div style={{ ...sC, marginBottom: 20 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>PÅidat kategorii</div>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>Přidat kategorii</div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <input style={{ ...sI, flex: 1, minWidth: 150 }} placeholder="NÃ¡zev kategorie" value={form.nazev} onChange={e => setForm(p => ({ ...p, nazev: e.target.value }))} onKeyDown={e => e.key === "Enter" && add()} />
+          <input style={{ ...sI, flex: 1, minWidth: 150 }} placeholder="Název kategorie" value={form.nazev} onChange={e => setForm(p => ({ ...p, nazev: e.target.value }))} onKeyDown={e => e.key === "Enter" && add()} />
           <select style={{ ...sI, width: "auto" }} value={form.typ} onChange={e => setForm(p => ({ ...p, typ: e.target.value }))}>
-            <option value="oba">PÅÃ­jem i VÃ½daj</option>
-            <option value="prijem">Pouze PÅÃ­jem</option>
-            <option value="vydaj">Pouze VÃ½daj</option>
+            <option value="oba">Příjem i Výdaj</option>
+            <option value="prijem">Pouze Příjem</option>
+            <option value="vydaj">Pouze Výdaj</option>
           </select>
-          <button style={{ ...sB, background: P.accent, color: "#fff" }} onClick={add}>PÅidat</button>
+          <button style={{ ...sB, background: P.accent, color: "#fff" }} onClick={add}>Přidat</button>
         </div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -1903,7 +1889,7 @@ function CatTab({ store, nt }) {
               <span style={{ fontWeight: 600 }}>{k.nazev}</span>
               <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 99, background: tc[k.typ] + "15", color: tc[k.typ] }}>{tl[k.typ]}</span>
             </div>
-            <button style={{ ...sB, background: P.red, color: "#fff", fontSize: 12, padding: "6px 12px" }} onClick={async () => { try { await store.delKat(k.id); nt("SmazÃ¡no"); } catch(e) { nt("Chyba: "+e.message,"error"); } }}>Smazat</button>
+            <button style={{ ...sB, background: P.red, color: "#fff", fontSize: 12, padding: "6px 12px" }} onClick={async () => { try { await store.delKat(k.id); nt("Smazáno"); } catch(e) { nt("Chyba: "+e.message,"error"); } }}>Smazat</button>
           </div>
         ))}
       </div>
