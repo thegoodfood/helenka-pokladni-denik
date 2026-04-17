@@ -759,8 +759,7 @@ function VkladForm({ user, store, firmy, defF, onBack, nt, typ }) {
   const [showSuccess, setShowSuccess] = useState(false);
   const fileRef = useRef();
   const [fileObj, setFileObj] = useState(null);
-  const [fileName, setFileName] = useState("");
-  const isVklad = typ === "prijem";
+    const isVklad = typ === "prijem";
 
   const save = () => {
     if (!castka || Number(castka) <= 0) return nt("Zadejte částku", "error");
@@ -864,8 +863,7 @@ function TxForm({ user, store, firmy, defF, onBack, nt }) {
   const [showSuccess, setShowSuccess] = useState(false);
   const fileRef = useRef();
   const [fileObj, setFileObj] = useState(null);
-  const [fileName, setFileName] = useState("");
-  const suggRef = useRef();
+    const suggRef = useRef();
   const up = (k, v) => setF(p => ({ ...p, [k]: v }));
   const filtKat = store.kategorie.filter(k => k.typ === "oba" || k.typ === f.typ);
   const dodLabel = f.typ === "prijem" ? "Odběratel" : "Dodavatel";
