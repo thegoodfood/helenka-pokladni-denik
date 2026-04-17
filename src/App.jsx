@@ -775,7 +775,7 @@ function VkladForm({ user, store, firmy, defF, onBack, nt, typ }) {
         catch (e) { nt("Příloha se nepodařila: " + e.message, "error"); }
       }
       const firmaNazev = store.firmy.find(x => x.id === Number(firma))?.nazev || "";
-      store.exportToSheets(saved || txData, user.jmeno, Number(firma), firmaNazev, null);
+      try { await store.exportToSheets(saved || txData, user.jmeno, Number(firma), firmaNazev, null); } catch(se) { console.warn("Sheets:", se.message); }
       if (fileName) store.uploadToDrive(fileName, user.jmeno, firmaNazev);
       setShowSuccess(true);
     } catch (e) {
@@ -898,7 +898,7 @@ function TxForm({ user, store, firmy, defF, onBack, nt }) {
       }
       const katName = f.kategorie_id ? store.kategorie.find(k => k.id === Number(f.kategorie_id))?.nazev : null;
       const firmaNazev = store.firmy.find(x => x.id === Number(f.firma_id))?.nazev || "";
-      store.exportToSheets(saved || txData, user.jmeno, Number(f.firma_id), firmaNazev, katName);
+      try { await store.exportToSheets(saved || txData, user.jmeno, Number(f.firma_id), firmaNazev, katName); } catch(se) { console.warn("Sheets:", se.message); }
       if (fileName) store.uploadToDrive(fileName, user.jmeno, firmaNazev);
       setShowSuccess(true);
     } catch (e) {
