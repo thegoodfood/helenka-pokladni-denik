@@ -183,16 +183,29 @@ function useStore() {
   };
 
   // ── GOOGLE DRIVE (simulováno) ─────────────────────────────
-  const uploadToDrive = (fileName, zamName, firmaNazev) => {
-    if (!fileName || !DRIVE_ROOT_FOLDER_ID) return null;
-    const logEntry = {
-      id: lid(), time: new Date().toISOString(),
-      fileName, firma: firmaNazev, zamestnanec: zamName,
-      path: `${firmaNazev} / ${zamName} / ${fileName}`,
-      rootFolder: DRIVE_ROOT_FOLDER_ID, status: "simulated",
-    };
+  const uploadToDrive = async (file, zamName, firmaNazev) => {
+    if (!file) return null;
+    const logEntry = { id: lid(), time: new Date().toISOString(), fileName: file.name, firma: firmaNazev, zamestnanec: zamName, status: "uploading" };
     setDriveLog(p => [logEntry, ...p]);
-    return logEntry;
+    try {
+      const b64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      fetch("https://script.google.com/macros/s/AKfycbwbg1IKzodTRNlNv0ZTV357bB8NpY558WmAT7fUaRYSYrpnXG6AM-M3DrfJ9Nire70klQ/exec", {
+        method: "POST", mode: "no-cors",
+        body: JSON.stringify({ zamestnanec: zamName, firma_nazev: firmaNazev, priloha_base64: b64, priloha_nazev: file.name, priloha_mime: file.type || "application/octet-stream" })
+      }).catch(() => {});
+      const updated = { ...logEntry, status: "ok" };
+      setDriveLog(p => p.map(e => e.id === logEntry.id ? updated : e));
+      return updated;
+    } catch (err) {
+      const updated = { ...logEntry, status: "error", error: err.message };
+      setDriveLog(p => p.map(e => e.id === logEntry.id ? updated : e));
+      return updated;
+    }
   };
 
   // ── FIRMY ─────────────────────────────────────────────────
@@ -779,7 +792,7 @@ function VkladForm({ user, store, firmy, defF, onBack, nt, typ }) {
       }
       const firmaNazev = store.firmy.find(x => x.id === Number(firma))?.nazev || "";
       try { await store.exportToSheets(saved || txData, user.jmeno, Number(firma), firmaNazev, null); } catch(se) { console.warn("Sheets:", se.message); }
-      if (fileName) store.uploadToDrive(fileName, user.jmeno, firmaNazev);
+      if (fileObj) store.uploadToDrive(fileObj, user.jmeno, firmaNazev);
       setShowSuccess(true);
     } catch (e) {
       nt("Chyba při ukládání: " + e.message, "error");
@@ -903,7 +916,7 @@ function TxForm({ user, store, firmy, defF, onBack, nt }) {
       const katName = f.kategorie_id ? store.kategorie.find(k => k.id === Number(f.kategorie_id))?.nazev : null;
       const firmaNazev = store.firmy.find(x => x.id === Number(f.firma_id))?.nazev || "";
       try { await store.exportToSheets(saved || txData, user.jmeno, Number(f.firma_id), firmaNazev, katName); } catch(se) { console.warn("Sheets:", se.message); }
-      if (fileName) store.uploadToDrive(fileName, user.jmeno, firmaNazev);
+      if (fileObj) store.uploadToDrive(fileObj, user.jmeno, firmaNazev);
       setShowSuccess(true);
     } catch (e) {
       nt("Chyba při ukládání: " + e.message, "error");
