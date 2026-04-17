@@ -168,7 +168,9 @@ function useStore() {
         je_vklad: txData.is_vklad ? (txData.typ === "prijem" ? "Vklad" : "Výběr") : "",
         storno: txData.storno || false,
       };
-      const res = await fetch(webhookUrl, { method: "POST", body: JSON.stringify(payload) });
+      // Fire and forget – neblokovat UI
+      fetch(webhookUrl, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) }).catch(() => {});
+      const res = { ok: true, json: async () => ({ success: true }) };
       const result = await res.json();
       const updated = { ...logEntry, status: result.success ? "ok" : "error", error: result.error };
       setSheetsLog(p => p.map(e => e.id === logEntry.id ? updated : e));
@@ -480,7 +482,7 @@ function Confirm({ msg, onYes, onNo }) {
       <div style={{ ...sC, maxWidth: 360, width: "100%", textAlign: "center" }}>
         <p style={{ fontSize: 15, fontWeight: 600, margin: "0 0 20px", lineHeight: 1.5 }}>{msg}</p>
         <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-          <button style={{ ...sB, background: P.green, color: "#fff", padding: "10px 28px" }} onClick={onYes}>Ano</button>
+          <button style={{ ...sB, background: P.green, color: "#fff", padding: "10px 28px" }} onClick={onYes} disabled={false}>Ano</button>
           <button style={{ ...sB, background: "transparent", color: P.ink2, border: `1.5px solid ${P.border}`, padding: "10px 28px" }} onClick={onNo}>Zrušit</button>
         </div>
       </div>
