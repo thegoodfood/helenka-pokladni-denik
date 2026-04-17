@@ -183,6 +183,7 @@ function useStore() {
   };
 
   // ── GOOGLE DRIVE (simulováno) ─────────────────────────────
+  const DRIVE_URL="https://script.google.com/macros/s/AKfycbwbg1IKzodTRNlNv0ZTV357bB8NpY558WmAT7fUaRYSYrpnXG6AM-M3DrfJ9Nire70klQ/exec";
   const uploadToDrive = async (file, zamName, firmaNazev) => {
     if (!file) return null;
     const logEntry = { id: lid(), time: new Date().toISOString(), fileName: file.name, firma: firmaNazev, zamestnanec: zamName, status: "uploading" };
