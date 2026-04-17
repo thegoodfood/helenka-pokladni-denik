@@ -141,7 +141,7 @@ function useStore() {
   const SHEETS_WEBHOOKS = {
     1: "https://script.google.com/macros/s/AKfycbx1hK6r5NyVvblSO5mxzFqeVD5ncbIE9CDmeQCvj6fQ2L7Nmr5g9zydTdRnOlaceT0Q/exec", // THE GOOD FOOD s.r.o.
     2: "https://script.google.com/macros/s/AKfycbxybOjYGvt0lJwjXCIlFIW21E5Gicqr1e1DB8shf9Zcuu35aE6fassR9kvxGGNLnQDNIQ/exec", // KREKRRR cz s.r.o.
-    3: null, // THE GOOD EVENT s.r.o. – doplnit
+    3: "https://script.google.com/macros/s/AKfycbxTqbuqdLM7VjXz0v1zwOh4rrgnk08gobxiW0UCa6Y5VURa3KYDbdzh3fe6kG49MIB94w/exec", // THE GOOD EVENT s.r.o.
   };
 
   const exportToSheets = async (txData, zamName, firmaId, firmaNazev, katName) => {
