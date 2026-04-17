@@ -137,26 +137,47 @@ function useStore() {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   // ── GOOGLE SHEETS (simulováno) ────────────────────────────
-  const exportToSheets = (txData, zamName, firmaId, firmaNazev, katName) => {
-    const firma = firmy.find(f => f.id === firmaId);
-    if (!firma || !firma.spreadsheet_id) return null;
-    const row = [
-      new Date(txData.created_at).toLocaleDateString("cs-CZ", { day: "2-digit", month: "2-digit", year: "2-digit" }),
-      new Date(txData.created_at).toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" }),
-      txData.typ === "prijem" ? "Příjem" : "Výdaj",
-      txData.typ_platby === "hotovost" ? "Hotovost" : "Karta",
-      katName || "—", txData.dodavatel || "—", txData.popis || "—",
-      txData.cena_bez_dph, txData.cena_s_dph,
-      txData.is_vklad ? (txData.typ === "prijem" ? "Vklad" : "Výběr") : "",
-      txData.storno ? "ANO" : "",
-    ];
+  // Mapa firmaId → Apps Script webhook URL
+  const SHEETS_WEBHOOKS = {
+    1: "https://script.google.com/macros/s/AKfycbx1hK6r5NyVvblSO5mxzFqeVD5ncbIE9CDmeQCvj6fQ2L7Nmr5g9zydTdRnOlaceT0Q/exec", // THE GOOD FOOD s.r.o.
+    2: "https://script.google.com/macros/s/AKfycbxybOjYGvt0lJwjXCIlFIW21E5Gicqr1e1DB8shf9Zcuu35aE6fassR9kvxGGNLnQDNIQ/exec", // KREKRRR cz s.r.o.
+    3: null, // THE GOOD EVENT s.r.o. – doplnit
+  };
+
+  const exportToSheets = async (txData, zamName, firmaId, firmaNazev, katName) => {
+    const webhookUrl = SHEETS_WEBHOOKS[firmaId];
     const logEntry = {
       id: lid(), time: new Date().toISOString(),
-      spreadsheet: firmaNazev, spreadsheetId: firma.spreadsheet_id,
-      sheet: zamName, row, status: "simulated",
+      spreadsheet: firmaNazev, sheet: zamName,
+      status: webhookUrl ? "pending" : "no_webhook",
     };
     setSheetsLog(p => [logEntry, ...p]);
-    return logEntry;
+    if (!webhookUrl) return logEntry;
+    try {
+      const payload = {
+        zamestnanec: zamName,
+        datum: new Date(txData.created_at).toLocaleDateString("cs-CZ", { day: "2-digit", month: "2-digit", year: "2-digit" }),
+        cas: new Date(txData.created_at).toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" }),
+        typ: txData.typ === "prijem" ? "Příjem" : "Výdaj",
+        typ_platby: txData.typ_platby === "hotovost" ? "Hotovost" : "Karta",
+        kategorie: katName || "—",
+        dodavatel: txData.dodavatel || "—",
+        popis: txData.popis || "—",
+        cena_bez_dph: txData.cena_bez_dph,
+        cena_s_dph: txData.cena_s_dph,
+        je_vklad: txData.is_vklad ? (txData.typ === "prijem" ? "Vklad" : "Výběr") : "",
+        storno: txData.storno || false,
+      };
+      const res = await fetch(webhookUrl, { method: "POST", body: JSON.stringify(payload) });
+      const result = await res.json();
+      const updated = { ...logEntry, status: result.success ? "ok" : "error", error: result.error };
+      setSheetsLog(p => p.map(e => e.id === logEntry.id ? updated : e));
+      return updated;
+    } catch (err) {
+      const updated = { ...logEntry, status: "error", error: err.message };
+      setSheetsLog(p => p.map(e => e.id === logEntry.id ? updated : e));
+      return updated;
+    }
   };
 
   // ── GOOGLE DRIVE (simulováno) ─────────────────────────────
