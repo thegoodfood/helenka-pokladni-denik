@@ -190,7 +190,7 @@ function useStore() {
     try {
       const b64 = await new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onload = () => resolve(reader.result.split(",")[1]);
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
@@ -207,7 +207,6 @@ function useStore() {
       return updated;
     }
   };
-
   // ── FIRMY ─────────────────────────────────────────────────
   const addFirma = async (nazev, spreadsheet_id) => {
     const row = await sbPost("firmy", { nazev, spreadsheet_id: spreadsheet_id || null });
