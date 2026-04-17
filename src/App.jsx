@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 
 /*
-  POKLADNÍ DENÍK — Helenka 1.0
+  POKLADNÍ DENÍK — Helenka 1.1
   Supabase backend – všechna data persistent v DB.
   Role: superadmin (vše), manažer (jen přiřazené firmy), zaměstnanec.
 */
