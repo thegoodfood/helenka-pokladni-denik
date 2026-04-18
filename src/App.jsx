@@ -186,7 +186,7 @@ function useStore() {
   const DRIVE_URL="https://script.google.com/macros/s/AKfycbwbg1IKzodTRNlNv0ZTV357bB8NpY558WmAT7fUaRYSYrpnXG6AM-M3DrfJ9Nire70klQ/exec";
   const uploadToDrive = async (file, zamName, firmaNazev) => {
     if (!file) return null;
-    const logEntry = { id: lid(), time: new Date().toISOString(), fileName: file.name, firma: firmaNazev, zamestnanec: zamName, status: "uploading" };
+    const logEntry = { id: lid(), time: new Date().toISOString(), fileName: file.name, firma: firmaNazev, zamestnanec: zamName, path: `${firmaNazev} / ${zamName} / ${file.name}`, status: "uploading" };
     setDriveLog(p => [logEntry, ...p]);
     try {
       const b64 = await new Promise((resolve, reject) => {
@@ -207,7 +207,7 @@ function useStore() {
       setDriveLog(p => p.map(e => e.id === logEntry.id ? updated : e));
       return updated;
     }
-  };
+  }
   // ── FIRMY ─────────────────────────────────────────────────
   const addFirma = async (nazev, spreadsheet_id) => {
     const row = await sbPost("firmy", { nazev, spreadsheet_id: spreadsheet_id || null });
