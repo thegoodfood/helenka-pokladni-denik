@@ -195,10 +195,19 @@ function useStore() {
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
-      fetch("https://script.google.com/macros/s/AKfycbwbg1IKzodTRNlNv0ZTV357bB8NpY558WmAT7fUaRYSYrpnXG6AM-M3DrfJ9Nire70klQ/exec", {
-        method: "Py: JSON.stringify({ zamestnanec: zamName, firma_nazev: firmaNazev, priloha_base64: b64, priloha_nazev: file.name, priloha_mime: file.type || "application/octet-stream" })
-      }).catch(() => {});
-      const updated = { ...logEntry, status: "ok" };
+      const res = await fetch(DRIVE_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          zamestnanec: zamName,
+          firma_nazev: firmaNazev,
+          priloha_base64: b64,
+          priloha_nazev: file.name,
+          priloha_mime: file.type || "application/octet-stream"
+        })
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || "Drive upload failed");
+      const updated = { ...logEntry, status: "ok", url: json.url };
       setDriveLog(p => p.map(e => e.id === logEntry.id ? updated : e));
       return updated;
     } catch (err) {
