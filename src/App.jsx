@@ -791,7 +791,7 @@ function VkladForm({ user, store, firmy, defF, onBack, nt, typ }) {
   };
 
   const doSave = async () => {
-    const txData = { zamestnanec_id: user.id, firma_id: Number(firma), typ, kategorie_id: null, dodavatel: "", popis: pozn.trim(), cena_bez_dph: Number(castka), cena_s_dph: Number(castka), typ_platby: "hotovost", priloha_url: fileName || null, is_vklad: true };
+    const txData = { zamestnanec_id: user.id, firma_id: Number(firma), typ, kategorie_id: null, dodavatel: "", popis: pozn.trim(), cena_bez_dph: Number(castka), cena_s_dph: Number(castka), typ_platby: "hotovost", priloha_url: null, is_vklad: true };
     try {
       const saved = await store.addTx(txData);
       if (fileObj && saved?.id) {
@@ -826,7 +826,7 @@ function VkladForm({ user, store, firmy, defF, onBack, nt, typ }) {
           <input style={sI} placeholder={isVklad ? "Odkud peníze přišly – např. výběr z banky" : "Kam peníze odešly – např. odvoz do trezoru"} value={pozn} onChange={e => setPozn(e.target.value)} />
         </Fl>
         <Fl l="Doklad (příloha)">
-          <input ref={fileRef} type="file" accept="image/*,application/pdf" capture="environment" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) setFileName(e.target.files[0].name); }} />
+          <input ref={fileRef} type="file" accept="image/*,application/pdf" capture="environment" style={{ display: "none" }} onChange={e => { const file = e.target.files[0]; if (file) { setFileObj(file); setFileName(file.name); } }} />
           <button style={{ ...sB, background: "transparent", color: P.accent, border: `1.5px solid ${P.accent}`, width: "100%", justifyContent: "center" }} onClick={() => fileRef.current.click()}>
             <Ic d={ic.upload} s={15} /> {fileName || "Vyfotit / nahrát doklad"}
           </button>
@@ -914,7 +914,7 @@ function TxForm({ user, store, firmy, defF, onBack, nt }) {
   };
 
   const doSave = async () => {
-    const txData = { zamestnanec_id: user.id, firma_id: Number(f.firma_id), typ: f.typ, kategorie_id: f.kategorie_id ? Number(f.kategorie_id) : null, dodavatel: f.dodavatel || null, popis: f.popis || null, cena_bez_dph: Number(f.bez) || 0, cena_s_dph: Number(f.sdph), typ_platby: f.platba, priloha_url: fileName || null, is_vklad: false };
+    const txData = { zamestnanec_id: user.id, firma_id: Number(f.firma_id), typ: f.typ, kategorie_id: f.kategorie_id ? Number(f.kategorie_id) : null, dodavatel: f.dodavatel || null, popis: f.popis || null, cena_bez_dph: Number(f.bez) || 0, cena_s_dph: Number(f.sdph), typ_platby: f.platba, priloha_url: null, is_vklad: false };
     try {
       const saved = await store.addTx(txData);
       if (fileObj && saved?.id) {
@@ -991,7 +991,7 @@ function TxForm({ user, store, firmy, defF, onBack, nt }) {
           </div>
         </Fl>
         <Fl l="Doklad">
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) setFileName(e.target.files[0].name); }} />
+          <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={e => { const file = e.target.files[0]; if (file) { setFileObj(file); setFileName(file.name); } }} />
           <button style={{ ...sB, background: "transparent", color: P.accent, border: `1.5px solid ${P.accent}`, width: "100%", justifyContent: "center" }} onClick={() => fileRef.current.click()}>
             <Ic d={ic.upload} s={15} /> {fileName || "Vyfotit / nahrát doklad"}
           </button>
