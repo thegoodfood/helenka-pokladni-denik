@@ -1051,6 +1051,36 @@ function AdminPanel({ user, store, scr, setScr, nt, onLogout }) {
   );
 }
 
+// Náhled přílohy – obrázek se vykreslí přímo, ostatní typy jako odkaz.
+// Pozor: u transakcí založených před opravou uploadu je v priloha_url
+// jen název souboru, ne adresa – tam není co zobrazit.
+const PrilohaNahled = ({ url }) => {
+  const jeAdresa = /^https?:\/\//i.test(url || "");
+  const jeObrazek = /\.(png|jpe?g|gif|webp|heic|heif)(\?|$)/i.test(url || "");
+
+  if (!jeAdresa) return (
+    <div style={{ background: "#f5f5f0", borderRadius: 8, padding: 16, textAlign: "center" }}>
+      <div style={{ fontSize: 32, marginBottom: 6 }}>⚠️</div>
+      <div style={{ fontFamily: fm, fontSize: 12, color: P.ink2, wordBreak: "break-all" }}>{url}</div>
+      <p style={{ fontSize: 11, color: P.ink3, margin: "8px 0 0", lineHeight: 1.4 }}>
+        Soubor se tehdy nenahrál – u záznamu zůstal jen název dokladu.
+      </p>
+    </div>
+  );
+
+  return (
+    <div style={{ background: "#f5f5f0", borderRadius: 8, padding: 12, textAlign: "center" }}>
+      {jeObrazek
+        ? <img src={url} alt="Doklad" style={{ maxWidth: "100%", maxHeight: "55vh", borderRadius: 6, display: "block", margin: "0 auto" }} />
+        : <div style={{ fontSize: 40, padding: "12px 0" }}>📄</div>}
+      <a href={url} target="_blank" rel="noopener noreferrer"
+        style={{ ...sB, background: P.accent, color: "#fff", textDecoration: "none", marginTop: 10 }}>
+        Otevřít v novém okně
+      </a>
+    </div>
+  );
+};
+
 // ============================================================
 // ADMIN: OVERVIEW (date filter, summary, CSV, storno, edit)
 // ============================================================
@@ -1229,11 +1259,7 @@ function OverviewTab({ store, nt, user, visibleFirmyIds }) {
               <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>📎 Náhled dokladu</h3>
               <button style={{ ...sB, background: "transparent", color: P.ink2, padding: "4px 8px" }} onClick={() => setPreviewUrl(null)}><Ic d={ic.x} s={16} /></button>
             </div>
-            <div style={{ background: "#f5f5f0", borderRadius: 8, padding: 20, fontSize: 14, color: P.ink2 }}>
-              <div style={{ fontSize: 48, marginBottom: 8 }}>📄</div>
-              <p style={{ fontFamily: fm, fontSize: 13 }}>{previewUrl}</p>
-              <p style={{ fontSize: 12, color: P.ink3, marginTop: 8 }}>Po nasazení na Vercel se zde zobrazí skutečný náhled souboru z Google Drive.</p>
-            </div>
+            <PrilohaNahled url={previewUrl} />
           </div>
         </div>
       )}
@@ -1299,9 +1325,8 @@ function TxDetail({ store, txId, user, onClose, nt }) {
         {/* Attachment */}
         {t.priloha_url && (
           <div style={{ ...sC, padding: "12px 16px", marginBottom: 16, background: P.blueBg, borderColor: "#b7cfe8" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: P.blue, marginBottom: 4 }}>📎 Příloha</div>
-            <div style={{ fontSize: 13, fontFamily: fm, color: P.ink2 }}>{t.priloha_url}</div>
-            <p style={{ fontSize: 11, color: P.ink3, margin: "6px 0 0" }}>Náhled bude dostupný po nasazení na Vercel + Google Drive.</p>
+            <div style={{ fontSize: 12, fontWeight: 700, color: P.blue, marginBottom: 8 }}>📎 Příloha</div>
+            <PrilohaNahled url={t.priloha_url} />
           </div>
         )}
 
