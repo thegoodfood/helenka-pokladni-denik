@@ -1,0 +1,12 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+credentials*.json
+*-service-account*.json
+
+node_modules/
+dist/
+*.log
