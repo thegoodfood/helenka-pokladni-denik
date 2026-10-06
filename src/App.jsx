@@ -497,6 +497,16 @@ function Toast({ msg, type, onClose }) {
 }
 
 // Confirm dialog
+function Saving() {
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, animation: "fIn .15s ease-out" }}>
+      <div style={{ ...sC, maxWidth: 360, width: "100%", textAlign: "center" }}>
+        <p style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>⏳ Ukládám…</p>
+      </div>
+    </div>
+  );
+}
+
 function Confirm({ msg, onYes, onNo }) {
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, animation: "fIn .15s ease-out" }}>
@@ -780,6 +790,7 @@ function VkladForm({ user, store, firmy, defF, onBack, nt, typ }) {
   const [fileName, setFileName] = useState("");
   const [confirm, setConfirm] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [saving, setSaving] = useState(false);
   const fileRef = useRef();
   const [fileObj, setFileObj] = useState(null);
     const isVklad = typ === "prijem";
@@ -791,6 +802,9 @@ function VkladForm({ user, store, firmy, defF, onBack, nt, typ }) {
   };
 
   const doSave = async () => {
+    if (saving) return;
+    setConfirm(false);
+    setSaving(true);
     const txData = { zamestnanec_id: user.id, firma_id: Number(firma), typ, kategorie_id: null, dodavatel: "", popis: pozn.trim(), cena_bez_dph: Number(castka), cena_s_dph: Number(castka), typ_platby: "hotovost", priloha_url: null, is_vklad: true };
     try {
       const saved = await store.addTx(txData);
@@ -801,8 +815,10 @@ function VkladForm({ user, store, firmy, defF, onBack, nt, typ }) {
       const firmaNazev = store.firmy.find(x => x.id === Number(firma))?.nazev || "";
       try { await store.exportToSheets(saved || txData, user.jmeno, Number(firma), firmaNazev, null); } catch(se) { console.warn("Sheets:", se.message); }
       if (fileObj) store.uploadToDrive(fileObj, user.jmeno, firmaNazev);
+      setSaving(false);
       setShowSuccess(true);
     } catch (e) {
+      setSaving(false);
       nt("Chyba při ukládání: " + e.message, "error");
     }
   };
@@ -810,6 +826,7 @@ function VkladForm({ user, store, firmy, defF, onBack, nt, typ }) {
   return (
     <div style={{ maxWidth: 460, margin: "0 auto", padding: "16px 16px 40px", animation: "fIn .2s ease-out" }}>
       {showSuccess && <SuccessScreen onDone={onBack} />}
+      {saving && <Saving />}
       {confirm && <Confirm msg={`${isVklad ? "Vklad" : "Výběr"} ${fmt(castka)} Kč – potvrdit?`} onYes={doSave} onNo={() => setConfirm(false)} />}
       <button style={{ ...sB, background: "transparent", color: P.ink2, padding: "6px 10px", marginBottom: 12 }} onClick={onBack}><Ic d={ic.back} s={16} /> Zpět</button>
       <h2 style={{ margin: "0 0 20px", fontSize: 20, fontWeight: 800 }}>{isVklad ? "💰 Vklad do pokladny" : "💸 Výběr z pokladny"}</h2>
@@ -884,6 +901,7 @@ function TxForm({ user, store, firmy, defF, onBack, nt }) {
   const [confirm, setConfirm] = useState(false);
   const [dupWarn, setDupWarn] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [saving, setSaving] = useState(false);
   const fileRef = useRef();
   const [fileObj, setFileObj] = useState(null);
     const suggRef = useRef();
@@ -914,6 +932,9 @@ function TxForm({ user, store, firmy, defF, onBack, nt }) {
   };
 
   const doSave = async () => {
+    if (saving) return;
+    setConfirm(false);
+    setSaving(true);
     const txData = { zamestnanec_id: user.id, firma_id: Number(f.firma_id), typ: f.typ, kategorie_id: f.kategorie_id ? Number(f.kategorie_id) : null, dodavatel: f.dodavatel || null, popis: f.popis || null, cena_bez_dph: Number(f.bez) || 0, cena_s_dph: Number(f.sdph), typ_platby: f.platba, priloha_url: null, is_vklad: false };
     try {
       const saved = await store.addTx(txData);
@@ -925,8 +946,10 @@ function TxForm({ user, store, firmy, defF, onBack, nt }) {
       const firmaNazev = store.firmy.find(x => x.id === Number(f.firma_id))?.nazev || "";
       try { await store.exportToSheets(saved || txData, user.jmeno, Number(f.firma_id), firmaNazev, katName); } catch(se) { console.warn("Sheets:", se.message); }
       if (fileObj) store.uploadToDrive(fileObj, user.jmeno, firmaNazev);
+      setSaving(false);
       setShowSuccess(true);
     } catch (e) {
+      setSaving(false);
       nt("Chyba při ukládání: " + e.message, "error");
     }
   };
@@ -940,6 +963,7 @@ function TxForm({ user, store, firmy, defF, onBack, nt }) {
   return (
     <div style={{ maxWidth: 460, margin: "0 auto", padding: "16px 16px 40px", animation: "fIn .2s ease-out" }}>
       {showSuccess && <SuccessScreen onDone={onBack} />}
+      {saving && <Saving />}
       {confirm && <Confirm msg={`Uložit ${f.typ === "prijem" ? "příjem" : "výdaj"} ${fmt(f.sdph)} Kč?`} onYes={doSave} onNo={() => setConfirm(false)} />}
       {dupWarn && <Confirm msg="⚠️ Velmi podobná transakce byla zadána před chvílí. Opravdu chcete pokračovat?" onYes={() => { setDupWarn(false); setConfirm(true); }} onNo={() => setDupWarn(false)} />}
       {limitWarn && <Confirm msg={`⚠️ Překročení limitu!\n${limitWarn.map(w => `${w.targetName}: ${fmt(w.newTotal)} / ${fmt(w.limit.limit_czk)} Kč (${w.limit.typ === "denny" ? "denní" : "měsíční"})`).join("\n")}\n\nPokračovat přesto?`} onYes={() => { setLimitWarn(null); setConfirm(true); }} onNo={() => setLimitWarn(null)} />}
