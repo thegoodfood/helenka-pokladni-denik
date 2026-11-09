@@ -15,6 +15,10 @@ Repo: `https://github.com/thegoodfood/helenka-pokladni-denik` (**public**, branc
   `kategorie`, `limity`, `notifikace`; fotky dokladů v Storage bucketu `receipts`.
   Supabase token z Alfreda sem **neplatí** (Unauthorized) — na zásahy do DB
   je potřeba jiný přístup.
+- ⚠️ **Supabase vrací max. 1 000 řádků na dotaz** (i když dáš vyšší `limit`).
+  Zůstatky se počítají v prohlížeči ze **všech** transakcí, takže `transakce`
+  se musí načítat celé po dávkách (`sbGetAll`) — nikdy ne s pevným limitem
+  (dřív `limit=500` → staré transakce vypadávaly a zůstatky samy skákaly).
 - **Google Sheets** = jen export, Apps Script webhook zvlášť pro každou ze 3 firem
   (`SHEETS_WEBHOOKS`), fire-and-forget. **Google Drive** = kopie příloh přes
   Apps Script (`DRIVE_URL`). Samotné Apps Scripty nejsou v repu.
@@ -38,7 +42,7 @@ Repo: `https://github.com/thegoodfood/helenka-pokladni-denik` (**public**, branc
 - **Nikdy nenasazuj na ostro bez odsouhlasení.**
 
 ## Git a přístup
-- Repo patří účtu `thegoodfood`, ne `AutomatizaceKrekrrr`.
+- Repo patří účtu `thegoodfood`, ne `ItKrekrrr`.
   Globální `gh` účet kvůli tomu **NEpřepínat**.
 - Push jde přes vlastní fine-grained token `GH_TOKEN_GOODFOOD` v `.env`
   (repa alfred, helenka, meatup-web; Contents: Read and write) a repo-lokální
@@ -62,3 +66,9 @@ Do repa nikdy (repo je veřejné). Tokeny jen do zdejšího `.env`
 - 6. 10. 2026 — nastaven push (token) a Vercel přístup; oprava: po „Ano“
   se ukáže „Ukládám…“ a zablokuje se dvojí uložení (hlášeno Samuelem —
   okno při nahrávání fotky viselo a vypadalo to, že ukládání nefunguje).
+- 9. 11. 2026 — větev `oprava-zustatky` (čeká na odsouhlasení): zůstatky ze
+  všech transakcí místo posledních 500 (hlášeno Kubou a Samem — „mizející“
+  účtenky, skákající zůstatky) a firma v potvrzovacím okně (účtenky se
+  omylem ukládaly do jiné firmy). Otevřené: rozdíl zůstatků v Eventu
+  (Jakub +46 tis., AdamT −21 tis.) ověřit s klientem; PINy a zápis do DB
+  jsou přes veřejný anon klíč dostupné komukoli.
