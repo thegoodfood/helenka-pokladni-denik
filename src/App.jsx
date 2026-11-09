@@ -28,6 +28,18 @@ async function sbGet(table, params = "") {
   return res.json();
 }
 
+// Načte VŠECHNY řádky po dávkách (Supabase vrací max. 1000 řádků na dotaz).
+// Zůstatky se počítají ze všech transakcí – nesmí chybět žádná stará.
+async function sbGetAll(table, params = "") {
+  const PAGE = 1000;
+  let all = [];
+  for (let from = 0; ; from += PAGE) {
+    const rows = await sbGet(table, `${params}${params ? "&" : ""}limit=${PAGE}&offset=${from}`);
+    all = all.concat(rows);
+    if (rows.length < PAGE) return all;
+  }
+}
+
 async function sbPost(table, body) {
   const res = await fetch(`${SB_URL}/rest/v1/${table}`, {
     method: "POST",
@@ -110,7 +122,7 @@ function useStore() {
         sbGet("zamestnanci", "order=jmeno.asc"),
         sbGet("zamestnanec_firma"),
         sbGet("kategorie", "order=nazev.asc"),
-        sbGet("transakce", "order=created_at.desc&limit=500"),
+        sbGetAll("transakce", "order=created_at.desc,id.desc"),
         sbGet("notifikace", "order=created_at.desc&limit=100"),
         sbGet("limity"),
       ]);
@@ -827,7 +839,7 @@ function VkladForm({ user, store, firmy, defF, onBack, nt, typ }) {
     <div style={{ maxWidth: 460, margin: "0 auto", padding: "16px 16px 40px", animation: "fIn .2s ease-out" }}>
       {showSuccess && <SuccessScreen onDone={onBack} />}
       {saving && <Saving />}
-      {confirm && <Confirm msg={`${isVklad ? "Vklad" : "Výběr"} ${fmt(castka)} Kč – potvrdit?`} onYes={doSave} onNo={() => setConfirm(false)} />}
+      {confirm && <Confirm msg={`${isVklad ? "Vklad" : "Výběr"} ${fmt(castka)} Kč – firma ${lu(Number(firma), firmy)} – potvrdit?`} onYes={doSave} onNo={() => setConfirm(false)} />}
       <button style={{ ...sB, background: "transparent", color: P.ink2, padding: "6px 10px", marginBottom: 12 }} onClick={onBack}><Ic d={ic.back} s={16} /> Zpět</button>
       <h2 style={{ margin: "0 0 20px", fontSize: 20, fontWeight: 800 }}>{isVklad ? "💰 Vklad do pokladny" : "💸 Výběr z pokladny"}</h2>
       <div style={sC}>
@@ -964,7 +976,7 @@ function TxForm({ user, store, firmy, defF, onBack, nt }) {
     <div style={{ maxWidth: 460, margin: "0 auto", padding: "16px 16px 40px", animation: "fIn .2s ease-out" }}>
       {showSuccess && <SuccessScreen onDone={onBack} />}
       {saving && <Saving />}
-      {confirm && <Confirm msg={`Uložit ${f.typ === "prijem" ? "příjem" : "výdaj"} ${fmt(f.sdph)} Kč?`} onYes={doSave} onNo={() => setConfirm(false)} />}
+      {confirm && <Confirm msg={`Uložit ${f.typ === "prijem" ? "příjem" : "výdaj"} ${fmt(f.sdph)} Kč do firmy ${lu(Number(f.firma_id), firmy)}?`} onYes={doSave} onNo={() => setConfirm(false)} />}
       {dupWarn && <Confirm msg="⚠️ Velmi podobná transakce byla zadána před chvílí. Opravdu chcete pokračovat?" onYes={() => { setDupWarn(false); setConfirm(true); }} onNo={() => setDupWarn(false)} />}
       {limitWarn && <Confirm msg={`⚠️ Překročení limitu!\n${limitWarn.map(w => `${w.targetName}: ${fmt(w.newTotal)} / ${fmt(w.limit.limit_czk)} Kč (${w.limit.typ === "denny" ? "denní" : "měsíční"})`).join("\n")}\n\nPokračovat přesto?`} onYes={() => { setLimitWarn(null); setConfirm(true); }} onNo={() => setLimitWarn(null)} />}
 
